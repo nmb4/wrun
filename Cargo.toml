@@ -1,0 +1,10 @@
+[package]
+name = "wrun"
+version = "0.1.0"
+edition = "2021"
+description = "A CLI runner for Wren scripts with system integration"
+license = "MIT"
+
+[dependencies]
+ruwren = { path = "../ruwren" }
+clap = { version = "4", features = ["derive"] }
