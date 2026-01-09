@@ -13,5 +13,6 @@ foreign class Shell {
     foreign static exitCode
     foreign static success
     foreign static exec(command)
+    foreign static interactive(command)
     foreign static spawn(command)
 }

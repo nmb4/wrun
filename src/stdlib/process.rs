@@ -109,6 +109,38 @@ impl Shell {
         }
     }
 
+    fn interactive(&mut self, command: WrenString) -> f64 {
+        let command = command.into_string().unwrap_or_default();
+        let status = if cfg!(target_os = "windows") {
+            Command::new("cmd")
+                .args(["/C", &command])
+                .stdin(Stdio::inherit())
+                .stdout(Stdio::inherit())
+                .stderr(Stdio::inherit())
+                .status()
+        } else {
+            Command::new("sh")
+                .args(["-c", &command])
+                .stdin(Stdio::inherit())
+                .stdout(Stdio::inherit())
+                .stderr(Stdio::inherit())
+                .status()
+        };
+
+        match status {
+            Ok(s) => {
+                self.last_exit_code = s.code().unwrap_or(-1);
+                self.last_success = s.success();
+                self.last_exit_code as f64
+            }
+            Err(_) => {
+                self.last_exit_code = -1;
+                self.last_success = false;
+                -1.0
+            }
+        }
+    }
+
     fn spawn(&self, command: WrenString) -> bool {
         let command = command.into_string().unwrap_or_default();
         let result = if cfg!(target_os = "windows") {
