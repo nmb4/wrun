@@ -10,8 +10,13 @@ use std::process::ExitCode;
 #[command(about = "A CLI runner for Wren scripts with system integration")]
 #[command(version)]
 struct Cli {
+    /// Evaluate Wren code directly instead of reading from a file
+    #[arg(short = 'e', long = "eval", value_name = "CODE")]
+    eval: Option<String>,
+
     /// The Wren script to execute
-    script: PathBuf,
+    #[arg(required_unless_present = "eval")]
+    script: Option<PathBuf>,
 
     /// Arguments to pass to the script
     #[arg(trailing_var_arg = true)]
@@ -21,17 +26,22 @@ struct Cli {
 fn main() -> ExitCode {
     let cli = Cli::parse();
 
-    let script_path = &cli.script;
-    let source = match std::fs::read_to_string(script_path) {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("Error reading script '{}': {}", script_path.display(), e);
-            return ExitCode::FAILURE;
+    let source = if let Some(eval_code) = &cli.eval {
+        eval_code.clone()
+    } else {
+        let script_path = cli.script.as_ref().unwrap();
+        match std::fs::read_to_string(script_path) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("Error reading script '{}': {}", script_path.display(), e);
+                return ExitCode::FAILURE;
+            }
         }
     };
 
-    let script_dir = script_path
-        .parent()
+    let script_dir = cli.script
+        .as_ref()
+        .and_then(|p| p.parent())
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| PathBuf::from("."));
 
