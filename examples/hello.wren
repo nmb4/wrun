@@ -30,7 +30,7 @@ System.print("")
 
 // Run a shell command
 System.print("Running 'gum confirm':")
-Shell.run("gum confirm")
+Shell.interactive("gum confirm")
 System.print("stdout: %(Shell.stdout)")
 System.print("exit code: %(Shell.exitCode)")
 System.print("")

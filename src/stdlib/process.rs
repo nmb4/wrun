@@ -1,5 +1,5 @@
-use ruwren::{wren_impl, ModuleLibrary, WrenObject};
 use ruwren::foreign_v2::WrenString;
+use ruwren::{wren_impl, ModuleLibrary, WrenObject};
 use std::process::{Command, Stdio};
 
 #[derive(WrenObject, Default)]
@@ -94,13 +94,9 @@ impl Shell {
     fn exec(&mut self, command: WrenString) -> f64 {
         let command = command.into_string().unwrap_or_default();
         let status = if cfg!(target_os = "windows") {
-            Command::new("cmd")
-                .args(["/C", &command])
-                .status()
+            Command::new("cmd").args(["/C", &command]).status()
         } else {
-            Command::new("sh")
-                .args(["-c", &command])
-                .status()
+            Command::new("sh").args(["-c", &command]).status()
         };
 
         match status {
@@ -144,13 +140,9 @@ impl Shell {
     fn spawn(&self, command: WrenString) -> bool {
         let command = command.into_string().unwrap_or_default();
         let result = if cfg!(target_os = "windows") {
-            Command::new("cmd")
-                .args(["/C", &command])
-                .spawn()
+            Command::new("cmd").args(["/C", &command]).spawn()
         } else {
-            Command::new("sh")
-                .args(["-c", &command])
-                .spawn()
+            Command::new("sh").args(["-c", &command]).spawn()
         };
 
         result.is_ok()
