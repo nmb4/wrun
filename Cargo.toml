@@ -1,7 +1,7 @@
 [package]
 name = "wrun"
-version = "0.2.0"
-edition = "2021"
+version = "0.3.0"
+edition = "2024"
 description = "A CLI runner for Wren scripts with system integration"
 license = "MIT"
 

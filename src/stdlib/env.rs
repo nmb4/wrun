@@ -1,5 +1,5 @@
 use ruwren::foreign_v2::WrenString;
-use ruwren::{wren_impl, ModuleLibrary, WrenObject};
+use ruwren::{ModuleLibrary, WrenObject, wren_impl};
 use std::env;
 
 #[derive(WrenObject, Default)]
@@ -15,12 +15,18 @@ impl Env {
     fn set(&self, key: WrenString, value: WrenString) {
         let key = key.into_string().unwrap_or_default();
         let value = value.into_string().unwrap_or_default();
-        env::set_var(&key, &value);
+        unsafe {
+            env::set_var(&key, &value);
+        }
+        // env::set_var(&key, &value);
     }
 
     fn remove(&self, key: WrenString) {
         let key = key.into_string().unwrap_or_default();
-        env::remove_var(&key);
+        unsafe {
+            env::remove_var(&key);
+        }
+        // env::remove_var(&key);
     }
 
     fn has(&self, key: WrenString) -> bool {
