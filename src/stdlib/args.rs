@@ -1,4 +1,4 @@
-use ruwren::{wren_impl, ModuleLibrary, WrenObject};
+use ruwren::{ModuleLibrary, WrenObject, wren_impl};
 use std::sync::RwLock;
 
 static ARGS: RwLock<Vec<String>> = RwLock::new(Vec::new());

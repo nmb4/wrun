@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 
 use ruwren::foreign_v2::WrenString;
-use ruwren::{wren_impl, ModuleLibrary, WrenObject};
+use ruwren::{ModuleLibrary, WrenObject, wren_impl};
 
 #[derive(WrenObject, Default)]
 pub struct Str;
@@ -341,7 +341,10 @@ impl Str {
     fn at(&self, s: WrenString, index: f64) -> String {
         let s = s.into_string().unwrap_or_default();
         let index = index as usize;
-        s.chars().nth(index).map(|c| c.to_string()).unwrap_or_default()
+        s.chars()
+            .nth(index)
+            .map(|c| c.to_string())
+            .unwrap_or_default()
     }
 
     // Length

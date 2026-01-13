@@ -39,7 +39,8 @@ fn main() -> ExitCode {
         }
     };
 
-    let script_dir = cli.script
+    let script_dir = cli
+        .script
         .as_ref()
         .and_then(|p| p.parent())
         .map(|p| p.to_path_buf())

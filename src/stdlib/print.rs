@@ -9,7 +9,6 @@ use std::sync::RwLock;
 
 // ANSI color codes using standard 16-color palette
 const RESET: &str = "\x1b[0m";
-const BOLD_DIM: &str = "\x1b[2m"; // dimmed text
 
 // Standard ANSI foreground colors (3X = normal, 9X = bright)
 const FG_BLACK: &str = "\x1b[30m";
@@ -29,19 +28,43 @@ const FG_BRIGHT_MAGENTA: &str = "\x1b[95m";
 const FG_BRIGHT_CYAN: &str = "\x1b[96m";
 const FG_BRIGHT_WHITE: &str = "\x1b[97m";
 
-// Standard ANSI background colors (4X = normal, 10X = bright)
-const BG_GRAY: &str = "\x1b[40m"; // dark gray for TRACE
-const BG_BLUE: &str = "\x1b[44m"; // blue for DEBUG
-const BG_GREEN: &str = "\x1b[42m"; // green for INFO
-const BG_YELLOW: &str = "\x1b[43m"; // yellow for WARN
-const BG_RED: &str = "\x1b[41m"; // red for ERROR
-
-fn badge(level_bg: &str, level_name: &str, level_fg: &str) -> String {
-    // Background + foreground + bold (2) + text + reset
+fn badge(level: u8, level_name: &str, custom_accent: Option<&str>) -> String {
+    let bg = bg_code(level);
+    // Format: [reset;accent]▌ + [black;bg;bold] LEVEL [reset] + space
+    // Matches: \033[0;32m▌\033[0;30;42;1m INFO \033[0;39m
     format!(
-        "{}{}{}\x1b[39;1m {} \x1b[0m",
-        level_bg, level_fg, BOLD_DIM, level_name
+        "\x1b[0;{}m▌\x1b[0;30;{};1m {} \x1b[0;39m ",
+        fg_code(level, custom_accent),
+        bg,
+        level_name
     )
+}
+
+fn fg_code(level: u8, custom_accent: Option<&str>) -> u8 {
+    if custom_accent.is_some() {
+        // Custom levels default to green
+        32
+    } else {
+        match level {
+            0 => 90, // TRACE - bright black (gray)
+            1 => 34, // DEBUG - blue
+            2 => 32, // INFO - green
+            3 => 33, // WARN - yellow
+            4 => 31, // ERROR - red
+            _ => 32, // CUSTOM - green
+        }
+    }
+}
+
+fn bg_code(level: u8) -> u8 {
+    match level {
+        0 => 100, // TRACE - bright black (visible gray)
+        1 => 44,  // DEBUG - blue
+        2 => 42,  // INFO - green
+        3 => 43,  // WARN - yellow
+        4 => 41,  // ERROR - red
+        _ => 42,  // CUSTOM - green
+    }
 }
 
 fn ansi_color(name: &str) -> &'static str {
@@ -158,34 +181,12 @@ fn level_name_to_num(name: &str) -> u8 {
     }
 }
 
-fn level_bg(level: u8) -> &'static str {
-    match level {
-        0 => BG_GRAY,   // TRACE - gray
-        1 => BG_BLUE,   // DEBUG - blue
-        2 => BG_GREEN,  // INFO - green
-        3 => BG_YELLOW, // WARN - yellow
-        4 => BG_RED,    // ERROR - red
-        _ => BG_GREEN,  // CUSTOM - green
-    }
-}
-
-fn level_fg(level: u8) -> &'static str {
-    match level {
-        0 => FG_BLACK, // TRACE - black on gray
-        1 => FG_BLACK, // DEBUG - black on blue
-        2 => FG_BLACK, // INFO - black on green
-        3 => FG_BLACK, // WARN - black on yellow
-        4 => FG_BLACK, // ERROR - black on red
-        _ => FG_BLACK, // CUSTOM - black on green
-    }
-}
-
 fn level_name(level: u8) -> &'static str {
     match level {
         0 => "TRACE",
         1 => "DEBUG",
-        2 => "INFO",
-        3 => "WARN",
+        2 => " INFO", // padded to 5 chars
+        3 => " WARN", // padded to 5 chars
         4 => "ERROR",
         _ => "CUSTOM",
     }
@@ -207,7 +208,7 @@ fn should_log_file(level: u8) -> bool {
     }
 }
 
-fn format_kv(kv_str: &str) -> String {
+fn format_kv(kv_str: &str, fg: u8) -> String {
     if kv_str.is_empty() {
         return String::new();
     }
@@ -215,7 +216,18 @@ fn format_kv(kv_str: &str) -> String {
     let formatted: Vec<String> = pairs
         .iter()
         .filter(|p| !p.is_empty())
-        .map(|p| format!("{}{}{}", FG_CYAN, p, RESET))
+        .map(|p| {
+            // Split on first '=' to separate key and value
+            if let Some(eq_pos) = p.find('=') {
+                let key = &p[..eq_pos];
+                let value = &p[eq_pos + 1..];
+                // key= is dimmed, value is accent color
+                format!("\x1b[0;39;2m{}=\x1b[0;{}m{}{}", key, fg, value, RESET)
+            } else {
+                // No '=' found, just dim the whole thing
+                format!("\x1b[0;39;2m{}{}", p, RESET)
+            }
+        })
         .collect();
     if formatted.is_empty() {
         String::new()
@@ -237,16 +249,21 @@ fn format_kv_plain(kv_str: &str) -> String {
     }
 }
 
-fn log_message(level: u8, level_str: &str, msg: &str, kv_str: &str, level_bg_color: &str) {
+fn log_message(level: u8, level_str: &str, msg: &str, kv_str: &str, custom_accent: Option<&str>) {
     let time_terminal = Local::now().format("%H:%M").to_string();
     let time_file = Local::now().format("%H:%M %d-%m-%y").to_string();
 
-    // Terminal output with badge format: | LEVEL | HH:MM   message
+    // Terminal output format: ▌ LEVEL  HH:MM(dim)  message
+    // Matches: \033[0;32m▌\033[0;30;42;1m INFO \033[0;39m \033[0;39;2m17:34\033[0;39m  add lol.rs\033[0;32m\n
     if should_log_terminal(level) {
-        let fg = level_fg(level);
-        let badge_str = badge(level_bg_color, level_str, fg);
-        let kv_formatted = format_kv(kv_str);
-        println!("{} {}   {}{}", badge_str, time_terminal, msg, kv_formatted);
+        let badge_str = badge(level, level_str, custom_accent);
+        let fg = fg_code(level, custom_accent);
+        let kv_formatted = format_kv(kv_str, fg);
+        // Time is dimmed, then reset, then message, then accent color for newline
+        println!(
+            "{}\x1b[0;39;2m{}\x1b[0;39m  {}{}\x1b[0;{}m",
+            badge_str, time_terminal, msg, kv_formatted, fg
+        );
     }
 
     // File output (unchanged format): HH:MM DD-MM-YY LEVEL message
@@ -287,57 +304,57 @@ impl LogInternal {
     // Level methods
     fn trace(&self, msg: WrenString) {
         let msg = msg.into_string().unwrap_or_default();
-        log_message(0, level_name(0), &msg, "", level_bg(0));
+        log_message(0, level_name(0), &msg, "", None);
     }
 
     fn traceKv(&self, msg: WrenString, kv: WrenString) {
         let msg = msg.into_string().unwrap_or_default();
         let kv = kv.into_string().unwrap_or_default();
-        log_message(0, level_name(0), &msg, &kv, level_bg(0));
+        log_message(0, level_name(0), &msg, &kv, None);
     }
 
     fn debug(&self, msg: WrenString) {
         let msg = msg.into_string().unwrap_or_default();
-        log_message(1, level_name(1), &msg, "", level_bg(1));
+        log_message(1, level_name(1), &msg, "", None);
     }
 
     fn debugKv(&self, msg: WrenString, kv: WrenString) {
         let msg = msg.into_string().unwrap_or_default();
         let kv = kv.into_string().unwrap_or_default();
-        log_message(1, level_name(1), &msg, &kv, level_bg(1));
+        log_message(1, level_name(1), &msg, &kv, None);
     }
 
     fn info(&self, msg: WrenString) {
         let msg = msg.into_string().unwrap_or_default();
-        log_message(2, level_name(2), &msg, "", level_bg(2));
+        log_message(2, level_name(2), &msg, "", None);
     }
 
     fn infoKv(&self, msg: WrenString, kv: WrenString) {
         let msg = msg.into_string().unwrap_or_default();
         let kv = kv.into_string().unwrap_or_default();
-        log_message(2, level_name(2), &msg, &kv, level_bg(2));
+        log_message(2, level_name(2), &msg, &kv, None);
     }
 
     fn warn(&self, msg: WrenString) {
         let msg = msg.into_string().unwrap_or_default();
-        log_message(3, level_name(3), &msg, "", level_bg(3));
+        log_message(3, level_name(3), &msg, "", None);
     }
 
     fn warnKv(&self, msg: WrenString, kv: WrenString) {
         let msg = msg.into_string().unwrap_or_default();
         let kv = kv.into_string().unwrap_or_default();
-        log_message(3, level_name(3), &msg, &kv, level_bg(3));
+        log_message(3, level_name(3), &msg, &kv, None);
     }
 
     fn error(&self, msg: WrenString) {
         let msg = msg.into_string().unwrap_or_default();
-        log_message(4, level_name(4), &msg, "", level_bg(4));
+        log_message(4, level_name(4), &msg, "", None);
     }
 
     fn errorKv(&self, msg: WrenString, kv: WrenString) {
         let msg = msg.into_string().unwrap_or_default();
         let kv = kv.into_string().unwrap_or_default();
-        log_message(4, level_name(4), &msg, &kv, level_bg(4));
+        log_message(4, level_name(4), &msg, &kv, None);
     }
 
     fn custom(&self, level_name_str: WrenString, msg: WrenString) {
@@ -346,11 +363,11 @@ impl LogInternal {
 
         if let Some(custom) = find_custom_level(&level_name_str) {
             let padded_name = format!("{:>5}", custom.name.to_uppercase());
-            log_message(custom.priority, &padded_name, &msg, "", custom.color);
+            log_message(custom.priority, &padded_name, &msg, "", Some(custom.color));
         } else {
             // Fallback: treat as custom above error
             let padded_name = format!("{:>5}", level_name_str.to_uppercase());
-            log_message(5, &padded_name, &msg, "", FG_GREEN);
+            log_message(5, &padded_name, &msg, "", None);
         }
     }
 
@@ -361,10 +378,10 @@ impl LogInternal {
 
         if let Some(custom) = find_custom_level(&level_name_str) {
             let padded_name = format!("{:>5}", custom.name.to_uppercase());
-            log_message(custom.priority, &padded_name, &msg, &kv, custom.color);
+            log_message(custom.priority, &padded_name, &msg, &kv, Some(custom.color));
         } else {
             let padded_name = format!("{:>5}", level_name_str.to_uppercase());
-            log_message(5, &padded_name, &msg, &kv, FG_GREEN);
+            log_message(5, &padded_name, &msg, &kv, None);
         }
     }
 
