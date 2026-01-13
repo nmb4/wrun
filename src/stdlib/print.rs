@@ -321,10 +321,10 @@ fn log_message(level: u8, level_str: &str, msg: &str, kv_str: &str, custom_color
         let badge_str = badge(level, level_str, custom_color);
         let fg = fg_code(level, custom_color);
         let kv_formatted = format_kv(kv_str, fg);
-        // Time is dimmed, then reset, then message, then accent color for newline
+        // Time is dimmed, then reset, then message, then reset at end
         println!(
-            "{}\x1b[0;39;2m{}\x1b[0;39m  {}{}\x1b[0;{}m",
-            badge_str, time_terminal, msg, kv_formatted, fg
+            "{}\x1b[0;39;2m{}\x1b[0;39m  {}{}\x1b[0m",
+            badge_str, time_terminal, msg, kv_formatted
         );
     }
 
