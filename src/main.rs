@@ -82,6 +82,11 @@ fn main() -> ExitCode {
 
     stdlib::args::set_args(cli.args.clone());
     stdlib::print::set_script_dir(script_dir.to_string_lossy().to_string());
+    if let Some(ref script_path) = cli.script {
+        if let Some(stem) = script_path.file_stem() {
+            stdlib::print::set_script_name(stem.to_string_lossy().to_string());
+        }
+    }
 
     if let Err(e) = vm.interpret("main", &source) {
         eprintln!("{}", e);

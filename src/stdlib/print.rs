@@ -126,6 +126,7 @@ struct CustomLevel {
 
 struct LogConfig {
     script_dir: Option<String>,
+    script_name: Option<String>,
     file_path: Option<String>,
     terminal_level: u8, // minimum level for terminal (default: INFO=2)
     file_level: u8,     // minimum level for file (default: DEBUG=1)
@@ -136,6 +137,7 @@ impl Default for LogConfig {
     fn default() -> Self {
         Self {
             script_dir: None,
+            script_name: None,
             file_path: None,
             terminal_level: 2, // INFO
             file_level: 1,     // DEBUG
@@ -146,6 +148,7 @@ impl Default for LogConfig {
 
 static LOG_CONFIG: RwLock<LogConfig> = RwLock::new(LogConfig {
     script_dir: None,
+    script_name: None,
     file_path: None,
     terminal_level: 2,
     file_level: 1,
@@ -158,13 +161,24 @@ pub fn set_script_dir(dir: String) {
     }
 }
 
+pub fn set_script_name(name: String) {
+    if let Ok(mut config) = LOG_CONFIG.write() {
+        config.script_name = Some(name);
+    }
+}
+
 fn get_log_file_path() -> Option<String> {
     if let Ok(config) = LOG_CONFIG.read() {
         if let Some(ref path) = config.file_path {
             return Some(path.clone());
         }
         if let Some(ref dir) = config.script_dir {
-            return Some(format!("{}/wrun.log", dir));
+            let name = config
+                .script_name
+                .as_ref()
+                .map(|n| n.as_str())
+                .unwrap_or("script");
+            return Some(format!("{}/wrun_{}.log", dir, name));
         }
     }
     None
