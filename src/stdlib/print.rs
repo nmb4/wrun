@@ -28,42 +28,43 @@ const FG_BRIGHT_MAGENTA: &str = "\x1b[95m";
 const FG_BRIGHT_CYAN: &str = "\x1b[96m";
 const FG_BRIGHT_WHITE: &str = "\x1b[97m";
 
-fn badge(level: u8, level_name: &str, custom_accent: Option<&str>) -> String {
-    let bg = bg_code(level);
-    // Format: [reset;accent]▌ + [black;bg;bold] LEVEL [reset] + space
-    // Matches: \033[0;32m▌\033[0;30;42;1m INFO \033[0;39m
+fn badge(level: u8, level_name: &str, custom_color: Option<&str>) -> String {
+    let bg = bg_code(level, custom_color);
+    // Format: [black;bg;bold] LEVEL [bg-as-fg;default-bg]▌[reset] + space
+    // Block char uses background color as foreground, with default bg (49) for the other half
     format!(
-        "\x1b[0;{}m▌\x1b[0;30;{};1m {} \x1b[0;39m ",
-        fg_code(level, custom_accent),
-        bg,
-        level_name
+        "\x1b[0;30;{};1m {} \x1b[0;{};49m▌\x1b[0;39m ",
+        bg, level_name, bg
     )
 }
 
-fn fg_code(level: u8, custom_accent: Option<&str>) -> u8 {
-    if custom_accent.is_some() {
-        // Custom levels default to green
-        32
+fn fg_code(level: u8, custom_color: Option<&str>) -> u8 {
+    if let Some(color_name) = custom_color {
+        ansi_fg_code(color_name)
     } else {
         match level {
             0 => 90, // TRACE - bright black (gray)
             1 => 34, // DEBUG - blue
             2 => 32, // INFO - green
-            3 => 33, // WARN - yellow
-            4 => 31, // ERROR - red
+            3 => 93, // WARN - bright yellow
+            4 => 91, // ERROR - bright red
             _ => 32, // CUSTOM - green
         }
     }
 }
 
-fn bg_code(level: u8) -> u8 {
-    match level {
-        0 => 100, // TRACE - bright black (visible gray)
-        1 => 44,  // DEBUG - blue
-        2 => 42,  // INFO - green
-        3 => 43,  // WARN - yellow
-        4 => 41,  // ERROR - red
-        _ => 42,  // CUSTOM - green
+fn bg_code(level: u8, custom_color: Option<&str>) -> u8 {
+    if let Some(color_name) = custom_color {
+        ansi_bg_code(color_name)
+    } else {
+        match level {
+            0 => 100, // TRACE - bright black (visible gray)
+            1 => 44,  // DEBUG - blue
+            2 => 42,  // INFO - green
+            3 => 103, // WARN - bright yellow background
+            4 => 101, // ERROR - bright red background
+            _ => 42,  // CUSTOM - green
+        }
     }
 }
 
@@ -87,6 +88,52 @@ fn ansi_color(name: &str) -> &'static str {
         "bright_cyan" => FG_BRIGHT_CYAN,
         "bright_white" => FG_BRIGHT_WHITE,
         _ => FG_WHITE,
+    }
+}
+
+fn ansi_bg_code(name: &str) -> u8 {
+    match name.to_lowercase().as_str() {
+        "black" => 40,
+        "red" => 41,
+        "green" => 42,
+        "yellow" => 43,
+        "blue" => 44,
+        "magenta" => 45,
+        "cyan" => 46,
+        "white" => 47,
+        "gray" | "grey" => 100,
+        "bright_black" => 100,
+        "bright_red" => 101,
+        "bright_green" => 102,
+        "bright_yellow" => 103,
+        "bright_blue" => 104,
+        "bright_magenta" => 105,
+        "bright_cyan" => 106,
+        "bright_white" => 107,
+        _ => 47,
+    }
+}
+
+fn ansi_fg_code(name: &str) -> u8 {
+    match name.to_lowercase().as_str() {
+        "black" => 30,
+        "red" => 31,
+        "green" => 32,
+        "yellow" => 33,
+        "blue" => 34,
+        "magenta" => 35,
+        "cyan" => 36,
+        "white" => 37,
+        "gray" | "grey" => 90,
+        "bright_black" => 90,
+        "bright_red" => 91,
+        "bright_green" => 92,
+        "bright_yellow" => 93,
+        "bright_blue" => 94,
+        "bright_magenta" => 95,
+        "bright_cyan" => 96,
+        "bright_white" => 97,
+        _ => 37,
     }
 }
 
@@ -120,8 +167,8 @@ impl Print {
 #[derive(Clone)]
 struct CustomLevel {
     name: String,
-    color: &'static str,
-    priority: u8, // 0=TRACE, 1=DEBUG, 2=INFO, 3=WARN, 4=ERROR, 5+=custom
+    color_name: String, // Store color name to derive both fg and bg codes
+    priority: u8,       // 0=TRACE, 1=DEBUG, 2=INFO, 3=WARN, 4=ERROR, 5+=custom
 }
 
 struct LogConfig {
@@ -199,8 +246,8 @@ fn level_name(level: u8) -> &'static str {
     match level {
         0 => "TRACE",
         1 => "DEBUG",
-        2 => " INFO", // padded to 5 chars
-        3 => " WARN", // padded to 5 chars
+        2 => "INFO ", // padded to 5 chars (left-aligned)
+        3 => "WARN ", // padded to 5 chars (left-aligned)
         4 => "ERROR",
         _ => "CUSTOM",
     }
@@ -263,15 +310,14 @@ fn format_kv_plain(kv_str: &str) -> String {
     }
 }
 
-fn log_message(level: u8, level_str: &str, msg: &str, kv_str: &str, custom_accent: Option<&str>) {
+fn log_message(level: u8, level_str: &str, msg: &str, kv_str: &str, custom_color: Option<&str>) {
     let time_terminal = Local::now().format("%H:%M").to_string();
     let time_file = Local::now().format("%H:%M %d-%m-%y").to_string();
 
-    // Terminal output format: ▌ LEVEL  HH:MM(dim)  message
-    // Matches: \033[0;32m▌\033[0;30;42;1m INFO \033[0;39m \033[0;39;2m17:34\033[0;39m  add lol.rs\033[0;32m\n
+    // Terminal output format: LEVEL ▌ HH:MM(dim)  message
     if should_log_terminal(level) {
-        let badge_str = badge(level, level_str, custom_accent);
-        let fg = fg_code(level, custom_accent);
+        let badge_str = badge(level, level_str, custom_color);
+        let fg = fg_code(level, custom_color);
         let kv_formatted = format_kv(kv_str, fg);
         // Time is dimmed, then reset, then message, then accent color for newline
         println!(
@@ -377,7 +423,13 @@ impl LogInternal {
 
         if let Some(custom) = find_custom_level(&level_name_str) {
             let padded_name = format!("{:>5}", custom.name.to_uppercase());
-            log_message(custom.priority, &padded_name, &msg, "", Some(custom.color));
+            log_message(
+                custom.priority,
+                &padded_name,
+                &msg,
+                "",
+                Some(&custom.color_name),
+            );
         } else {
             // Fallback: treat as custom above error
             let padded_name = format!("{:>5}", level_name_str.to_uppercase());
@@ -392,7 +444,13 @@ impl LogInternal {
 
         if let Some(custom) = find_custom_level(&level_name_str) {
             let padded_name = format!("{:>5}", custom.name.to_uppercase());
-            log_message(custom.priority, &padded_name, &msg, &kv, Some(custom.color));
+            log_message(
+                custom.priority,
+                &padded_name,
+                &msg,
+                &kv,
+                Some(&custom.color_name),
+            );
         } else {
             let padded_name = format!("{:>5}", level_name_str.to_uppercase());
             log_message(5, &padded_name, &msg, &kv, None);
@@ -428,8 +486,6 @@ impl LogInternal {
         let color_name = color.into_string().unwrap_or_default();
         let base = base_level.into_string().unwrap_or_default();
 
-        let color_code = ansi_color(&color_name);
-
         let priority = if base.is_empty() {
             5 // above error, always prints
         } else {
@@ -438,7 +494,7 @@ impl LogInternal {
 
         let custom = CustomLevel {
             name,
-            color: color_code,
+            color_name,
             priority,
         };
 
