@@ -30,11 +30,13 @@ const FG_BRIGHT_WHITE: &str = "\x1b[97m";
 
 fn badge(level: u8, level_name: &str, custom_color: Option<&str>) -> String {
     let bg = bg_code(level, custom_color);
-    // Format: [black;bg;bold] LEVEL [bg-as-fg;default-bg]▌[reset] + space
-    // Block char uses background color as foreground, with default bg (49) for the other half
+    let fg = fg_code(level, custom_color);
+    // Format: [black;bg;bold] LEVEL [fg;default-bg]▐[reset] + space
+    // Use ▐ (right half block) so the colored part faces the badge (on left)
+    // Right half = foreground (badge color), Left half = background (terminal default)
     format!(
-        "\x1b[0;30;{};1m {} \x1b[0;{};49m▌\x1b[0;39m ",
-        bg, level_name, bg
+        "\x1b[0;30;{};1m {} \x1b[0;{};49m▐\x1b[0;39m ",
+        bg, level_name, fg
     )
 }
 
@@ -422,7 +424,7 @@ impl LogInternal {
         let msg = msg.into_string().unwrap_or_default();
 
         if let Some(custom) = find_custom_level(&level_name_str) {
-            let padded_name = format!("{:>5}", custom.name.to_uppercase());
+            let padded_name = format!("{:<5}", custom.name.to_uppercase());
             log_message(
                 custom.priority,
                 &padded_name,
@@ -432,7 +434,7 @@ impl LogInternal {
             );
         } else {
             // Fallback: treat as custom above error
-            let padded_name = format!("{:>5}", level_name_str.to_uppercase());
+            let padded_name = format!("{:<5}", level_name_str.to_uppercase());
             log_message(5, &padded_name, &msg, "", None);
         }
     }
@@ -443,7 +445,7 @@ impl LogInternal {
         let kv = kv.into_string().unwrap_or_default();
 
         if let Some(custom) = find_custom_level(&level_name_str) {
-            let padded_name = format!("{:>5}", custom.name.to_uppercase());
+            let padded_name = format!("{:<5}", custom.name.to_uppercase());
             log_message(
                 custom.priority,
                 &padded_name,
@@ -452,7 +454,7 @@ impl LogInternal {
                 Some(&custom.color_name),
             );
         } else {
-            let padded_name = format!("{:>5}", level_name_str.to_uppercase());
+            let padded_name = format!("{:<5}", level_name_str.to_uppercase());
             log_message(5, &padded_name, &msg, &kv, None);
         }
     }
