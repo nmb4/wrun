@@ -9,3 +9,4 @@ license = "MIT"
 # ruwren = { path = "../ruwren" }
 ruwren = "0.4.10"
 clap = { version = "4", features = ["derive"] }
+chrono = "0.4"

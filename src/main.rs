@@ -50,7 +50,7 @@ fn main() -> ExitCode {
 
     let vm = VMConfig::new()
         .library(&lib)
-        .script_loader(BasicFileLoader::new().base_dir(script_dir))
+        .script_loader(BasicFileLoader::new().base_dir(script_dir.clone()))
         .build();
 
     let stdlib_src = stdlib::get_stdlib_source();
@@ -70,8 +70,17 @@ fn main() -> ExitCode {
         eprintln!("{}", e);
         return ExitCode::FAILURE;
     }
+    if let Err(e) = vm.interpret("wrun/str", stdlib_src.str) {
+        eprintln!("{}", e);
+        return ExitCode::FAILURE;
+    }
+    if let Err(e) = vm.interpret("wrun/print", stdlib_src.print) {
+        eprintln!("{}", e);
+        return ExitCode::FAILURE;
+    }
 
     stdlib::args::set_args(cli.args.clone());
+    stdlib::print::set_script_dir(script_dir.to_string_lossy().to_string());
 
     if let Err(e) = vm.interpret("main", &source) {
         eprintln!("{}", e);
