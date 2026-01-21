@@ -427,6 +427,151 @@ Shell.spawn("long-running-task --daemon")
 
 ---
 
+## wrun/pipeline
+
+Async command orchestration with dependency management and failure handling.
+
+```wren
+import "wrun/pipeline" for Pipeline, TaskResult, Parallel, Sequential
+```
+
+### Pipeline Class
+
+The main orchestrator for running commands with dependencies.
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `Pipeline.new()` | `Pipeline` | Create a new pipeline |
+| `task(name, command)` | `Pipeline` | Add a task with no dependencies (runs immediately) |
+| `after(dep, name, command)` | `Pipeline` | Add a task that runs after `dep` completes |
+| `afterAll(deps, name, command)` | `Pipeline` | Add a task that runs after all `deps` complete |
+| `configure(name)` | `Task` | Get a task for further configuration |
+| `onSuccess(name, fn)` | `Pipeline` | Set callback when task succeeds |
+| `onFail(name, fn)` | `Pipeline` | Set callback when task fails |
+| `failureMode(name, mode)` | `Pipeline` | Set failure behavior for a task |
+| `finally(command)` | `Pipeline` | Set final command to run after all tasks |
+| `finallyMode(mode)` | `Pipeline` | Set when finally runs: `"success"`, `"always"`, `"failure"` |
+| `pollInterval(seconds)` | `Pipeline` | Set poll interval (default: 0.05s) |
+| `verbose(enabled)` | `Pipeline` | Enable/disable logging (default: true) |
+| `run()` | `PipelineResult` | Execute the pipeline |
+
+**Failure Modes** (set via `failureMode(name, mode)`):
+- `"continue"` (default): Other tasks keep running, pipeline marked failed
+- `"stop"`: Abort all pending tasks immediately
+- `"ignore"`: Treat failure as success for dependency purposes
+
+**Finally Modes**:
+- `"success"` (default): Run only if all tasks succeeded
+- `"always"`: Always run
+- `"failure"`: Run only if something failed
+
+### TaskResult Class
+
+Result of a completed task, passed to callbacks.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `name` | `String` | Task name |
+| `exitCode` | `Num` | Exit code of the command |
+| `stdout` | `String` | Captured stdout |
+| `stderr` | `String` | Captured stderr |
+| `success` | `Bool` | `true` if exit code is 0 |
+
+### PipelineResult Class
+
+Result of pipeline execution.
+
+| Property/Method | Type | Description |
+|-----------------|------|-------------|
+| `success` | `Bool` | `true` if all tasks succeeded |
+| `aborted` | `Bool` | `true` if pipeline was aborted |
+| `results` | `Map` | Map of task name to TaskResult |
+| `[name]` | `TaskResult` | Get result for a specific task |
+| `succeeded(name)` | `Bool` | Check if a specific task succeeded |
+
+### Parallel Class
+
+Convenience for running commands in parallel.
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `Parallel.run(commands)` | `PipelineResult` | Run list of commands in parallel |
+| `Parallel.runNamed(map)` | `PipelineResult` | Run map of name->command in parallel |
+
+### Sequential Class
+
+Convenience for running commands sequentially.
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `Sequential.run(commands)` | `PipelineResult` | Run list of commands one after another |
+
+**Examples**:
+```wren
+import "wrun/pipeline" for Pipeline
+import "wrun/file" for File
+
+// Build pipeline with dependencies
+var p = Pipeline.new()
+
+// These run in parallel (no dependencies)
+p.task("github", "gh repo create myrepo --public --source=. --push")
+p.task("readme", "claude -p 'Generate README'")
+
+// Vercel runs after GitHub
+p.after("github", "vercel", "vercel --prod --yes")
+
+// Domain runs after Vercel
+p.after("vercel", "domain", "vercel domains add example.com")
+
+// Handle README result
+p.onSuccess("readme", Fn.new { |result|
+  File.write("README.md", result.stdout)
+})
+
+// Git push runs only if everything succeeded
+p.finally("git push")
+p.finallyMode("success")
+
+p.run()
+```
+
+```wren
+import "wrun/pipeline" for Parallel, Sequential
+
+// Quick parallel execution
+Parallel.run([
+  "npm run build",
+  "npm run lint",
+  "npm run test"
+])
+
+// Quick sequential execution  
+Sequential.run([
+  "npm install",
+  "npm run build",
+  "npm run deploy"
+])
+```
+
+---
+
+## wrun/process (Async Extensions)
+
+Additional async methods on the Shell class.
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `Shell.spawnAsync(command)` | `Num` | Spawn async process, returns handle (0 on failure) |
+| `Shell.isDone(handle)` | `Bool` | Non-blocking check if process finished |
+| `Shell.wait(handle)` | `Num` | Blocking wait, returns exit code |
+| `Shell.getStdout(handle)` | `String` | Get stdout after completion |
+| `Shell.getStderr(handle)` | `String` | Get stderr after completion |
+| `Shell.getExitCode(handle)` | `Num` | Get exit code after completion |
+| `Shell.cleanup(handle)` | `Bool` | Remove handle from tracking |
+
+---
+
 ## Quick Import Reference
 
 ```wren
@@ -436,6 +581,7 @@ import "wrun/file" for File, Dir, Path
 import "wrun/env" for Env
 import "wrun/args" for Args
 import "wrun/process" for Process, Shell
+import "wrun/pipeline" for Pipeline, Parallel, Sequential
 ```
 
 ---

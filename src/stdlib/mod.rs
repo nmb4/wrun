@@ -14,6 +14,7 @@ pub struct StdlibSource {
     pub args: &'static str,
     pub str: &'static str,
     pub print: &'static str,
+    pub pipeline: &'static str,
 }
 
 pub fn get_stdlib_source() -> StdlibSource {
@@ -24,6 +25,7 @@ pub fn get_stdlib_source() -> StdlibSource {
         args: include_str!("wren/args.wren"),
         str: include_str!("wren/str.wren"),
         print: include_str!("wren/print.wren"),
+        pipeline: include_str!("wren/pipeline.wren"),
     }
 }
 

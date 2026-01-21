@@ -79,6 +79,10 @@ fn main() -> ExitCode {
         eprintln!("{}", e);
         return ExitCode::FAILURE;
     }
+    if let Err(e) = vm.interpret("wrun/pipeline", stdlib_src.pipeline) {
+        eprintln!("{}", e);
+        return ExitCode::FAILURE;
+    }
 
     stdlib::args::set_args(cli.args.clone());
     stdlib::print::set_script_dir(script_dir.to_string_lossy().to_string());
