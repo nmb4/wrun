@@ -50,7 +50,7 @@ class Task {
     _result = null
     _onSuccessCallback = null
     _onFailureCallback = null
-    _logLevel = "info"      // Log level for this task
+    _logLevel = "trace"     // Log level for this task
   }
 
   name { _name }
@@ -266,9 +266,9 @@ class Pipeline {
       // Failed to spawn
       task.done = true
       task.result = TaskResult.new(task.name, -1, "", "Failed to spawn process")
-      if (_verbose) Log.error("Failed to start: %(task.name)")
+      if (_verbose) Log.error("Failed to start task", {"task": task.name})
     } else {
-      if (_verbose) Log.custom(task.logLevel, "Started: %(task.name)")
+      if (_verbose) Log.custom(task.logLevel, "Started", {"task": task.name})
     }
   }
 
@@ -284,9 +284,9 @@ class Pipeline {
     _results[task.name] = task.result
     
     if (task.success) {
-      if (_verbose) Log.custom(task.logLevel, "Completed: %(task.name)")
+      if (_verbose) Log.custom(task.logLevel, "Completed", {"task": task.name, "exitCode": code})
     } else {
-      if (_verbose) Log.warn("Failed: %(task.name) (exit code %(code))")
+      if (_verbose) Log.warn("Failed", {"task": task.name, "exitCode": code})
     }
     
     task.invokeCallbacks()
@@ -294,14 +294,14 @@ class Pipeline {
 
   // Main execution loop
   run() {
-    if (_verbose) Log.info("Pipeline starting with %(this.taskCount) tasks")
+    if (_verbose) Log.custom("trace", "Pipeline starting", {"tasks": this.taskCount})
 
     // Main event loop
     while (!allDone_() && !_aborted) {
       // Check for abort condition
       if (shouldAbort_()) {
         _aborted = true
-        if (_verbose) Log.error("Pipeline aborted due to task failure")
+        if (_verbose) Log.error("Pipeline aborted", {"reason": "task failure"})
         break
       }
 
@@ -341,23 +341,23 @@ class Pipeline {
       }
 
       if (shouldRun) {
-        if (_verbose) Log.info("Running finally: %(_finally)")
+        if (_verbose) Log.custom("trace", "Running finally", {"command": _finally})
         var code = Shell.exec(_finally)
         if (code == 0) {
-          if (_verbose) Log.info("Finally completed successfully")
+          if (_verbose) Log.custom("trace", "Finally completed", {"exitCode": code})
         } else {
-          if (_verbose) Log.warn("Finally failed with code %(code)")
+          if (_verbose) Log.warn("Finally failed", {"exitCode": code})
         }
       }
     }
 
     if (_verbose) {
       if (_aborted) {
-        Log.error("Pipeline aborted")
+        Log.error("Pipeline aborted", {"success": false})
       } else if (allSucceeded_()) {
-        Log.info("Pipeline completed successfully")
+        Log.custom("trace", "Pipeline completed", {"success": true})
       } else {
-        Log.warn("Pipeline completed with failures")
+        Log.warn("Pipeline completed", {"success": false})
       }
     }
 
@@ -401,11 +401,24 @@ class PipelineResult {
 // Convenience builder for common patterns
 class Parallel {
   // Run multiple commands in parallel, return when all complete
-  static run(commands) {
+  // Set showOutput to true to print stdout/stderr from each task
+  static run(commands) { run(commands, false) }
+  static run(commands, showOutput) {
     var p = Pipeline.new().verbose(false)
     var i = 0
     for (cmd in commands) {
-      p.task("task_%(i)", cmd)
+      var name = "task_%(i)"
+      p.task(name, cmd)
+      if (showOutput) {
+        p.onSuccess(name, Fn.new { |r|
+          var out = r.stdout.trim()
+          if (out != "") System.print(out)
+        })
+        p.onFail(name, Fn.new { |r|
+          var err = r.stderr.trim()
+          if (err != "") System.print(err)
+        })
+      }
       i = i + 1
     }
     return p.run()
@@ -413,10 +426,21 @@ class Parallel {
 
   // Run multiple named commands in parallel
   // commands is a Map of name -> command
-  static runNamed(commands) {
+  static runNamed(commands) { runNamed(commands, false) }
+  static runNamed(commands, showOutput) {
     var p = Pipeline.new().verbose(false)
     for (entry in commands) {
       p.task(entry.key, entry.value)
+      if (showOutput) {
+        p.onSuccess(entry.key, Fn.new { |r|
+          var out = r.stdout.trim()
+          if (out != "") System.print("[%(r.name)] %(out)")
+        })
+        p.onFail(entry.key, Fn.new { |r|
+          var err = r.stderr.trim()
+          if (err != "") System.print("[%(r.name)] %(err)")
+        })
+      }
     }
     return p.run()
   }
@@ -425,7 +449,9 @@ class Parallel {
 // Convenience for sequential execution
 class Sequential {
   // Run commands one after another
-  static run(commands) {
+  // Set showOutput to true to print stdout/stderr from each task
+  static run(commands) { run(commands, false) }
+  static run(commands, showOutput) {
     var p = Pipeline.new().verbose(false)
     var prev = null
     var i = 0
@@ -435,6 +461,16 @@ class Sequential {
         p.task(name, cmd)
       } else {
         p.after(prev, name, cmd)
+      }
+      if (showOutput) {
+        p.onSuccess(name, Fn.new { |r|
+          var out = r.stdout.trim()
+          if (out != "") System.print(out)
+        })
+        p.onFail(name, Fn.new { |r|
+          var err = r.stderr.trim()
+          if (err != "") System.print(err)
+        })
       }
       prev = name
       i = i + 1
