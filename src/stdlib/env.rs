@@ -1,5 +1,5 @@
 use ruwren::foreign_v2::WrenString;
-use ruwren::{ModuleLibrary, WrenObject, wren_impl};
+use ruwren::{wren_impl, ModuleLibrary, WrenObject};
 use std::env;
 
 #[derive(WrenObject, Default)]

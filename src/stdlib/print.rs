@@ -2,7 +2,7 @@
 
 use chrono::Local;
 use ruwren::foreign_v2::WrenString;
-use ruwren::{ModuleLibrary, WrenObject, wren_impl};
+use ruwren::{wren_impl, ModuleLibrary, WrenObject};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::sync::RwLock;

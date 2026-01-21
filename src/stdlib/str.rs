@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 
 use ruwren::foreign_v2::WrenString;
-use ruwren::{ModuleLibrary, WrenObject, wren_impl};
+use ruwren::{wren_impl, ModuleLibrary, WrenObject};
 
 #[derive(WrenObject, Default)]
 pub struct Str;

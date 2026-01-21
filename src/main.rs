@@ -1,5 +1,6 @@
 mod stdlib;
 
+use crate::stdlib::process::set_dry_run;
 use clap::Parser;
 use ruwren::{BasicFileLoader, ModuleLibrary, VMConfig};
 use std::path::PathBuf;
@@ -21,6 +22,10 @@ struct Cli {
     /// Arguments to pass to the script
     #[arg(trailing_var_arg = true)]
     args: Vec<String>,
+
+    /// Print shell commands instead of executing them
+    #[arg(long = "dry-run")]
+    dry_run: bool,
 }
 
 fn main() -> ExitCode {
@@ -48,6 +53,7 @@ fn main() -> ExitCode {
 
     let mut lib = ModuleLibrary::new();
     stdlib::publish_modules(&mut lib);
+    set_dry_run(cli.dry_run);
 
     let vm = VMConfig::new()
         .library(&lib)
