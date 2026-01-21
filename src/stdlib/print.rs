@@ -142,10 +142,10 @@ fn ansi_fg_code(name: &str) -> u8 {
 // ============== Print Class ==============
 
 #[derive(WrenObject, Default)]
-pub struct Print;
+pub struct PrintInternal;
 
 #[wren_impl]
-impl Print {
+impl PrintInternal {
     fn eprint(&self, msg: WrenString) {
         let msg = msg.into_string().unwrap_or_default();
         eprintln!("{}", msg);
@@ -512,7 +512,7 @@ impl LogInternal {
 
 ruwren::wren_module! {
     mod wrun_print {
-        pub crate::stdlib::print::Print;
+        pub crate::stdlib::print::PrintInternal;
         pub crate::stdlib::print::LogInternal;
     }
 }

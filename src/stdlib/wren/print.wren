@@ -1,8 +1,14 @@
-foreign class Print {
+foreign class PrintInternal {
     construct new() {}
     foreign static eprint(msg)
     foreign static cprint(msg)
     foreign static cprintColor(msg, color)
+}
+
+class Print {
+    static eprint(msg) { PrintInternal.eprint(msg) }
+    static cprint(msg) { PrintInternal.cprint(msg) }
+    static cprint(msg, color) { PrintInternal.cprintColor(msg, color) }
 }
 
 foreign class LogInternal {

@@ -43,4 +43,4 @@ Log.info("Application stopped", {"uptime": "2h 15m 32s", "requests_served": 1542
 System.print("\n=== Print Module Tests ===")
 Print.eprint("This is an error message to stderr.")
 Print.cprint("This is a standard message to stdout.")
-Print.cprintColor("This is a colored message to stdout.", "green")
+Print.cprint("This is a colored message to stdout.", "yellow")
