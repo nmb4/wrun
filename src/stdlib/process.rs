@@ -121,7 +121,7 @@ impl Shell {
         let status = if cfg!(target_os = "windows") {
             Command::new("cmd").args(["/C", &command]).status()
         } else {
-            Command::new("sh").args(["/c", &command]).status()
+            Command::new("sh").args(["-c", &command]).status()
         };
 
         match status {
