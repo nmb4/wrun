@@ -1,6 +1,13 @@
 use ruwren::foreign_v2::WrenString;
-use ruwren::{ModuleLibrary, WrenObject, wren_impl};
+use ruwren::{wren_impl, ModuleLibrary, WrenObject};
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
+
+static DRY_RUN: AtomicBool = AtomicBool::new(false);
+
+pub fn set_dry_run(dry_run: bool) {
+    DRY_RUN.store(dry_run, Ordering::SeqCst);
+}
 
 #[derive(WrenObject, Default)]
 pub struct Process;
@@ -39,6 +46,16 @@ pub struct Shell {
 impl Shell {
     fn run(&mut self, command: WrenString) -> bool {
         let command = command.into_string().unwrap_or_default();
+
+        if DRY_RUN.load(Ordering::SeqCst) {
+            println!("[dry-run] {command}");
+            self.last_stdout = String::new();
+            self.last_stderr = String::new();
+            self.last_exit_code = 0;
+            self.last_success = true;
+            return true;
+        }
+
         let output = if cfg!(target_os = "windows") {
             Command::new("cmd")
                 .args(["/C", &command])
@@ -93,10 +110,18 @@ impl Shell {
 
     fn exec(&mut self, command: WrenString) -> f64 {
         let command = command.into_string().unwrap_or_default();
+
+        if DRY_RUN.load(Ordering::SeqCst) {
+            println!("[dry-run] {command}");
+            self.last_exit_code = 0;
+            self.last_success = true;
+            return 0.0;
+        }
+
         let status = if cfg!(target_os = "windows") {
             Command::new("cmd").args(["/C", &command]).status()
         } else {
-            Command::new("sh").args(["-c", &command]).status()
+            Command::new("sh").args(["/c", &command]).status()
         };
 
         match status {
@@ -107,6 +132,14 @@ impl Shell {
 
     fn interactive(&mut self, command: WrenString) -> f64 {
         let command = command.into_string().unwrap_or_default();
+
+        if DRY_RUN.load(Ordering::SeqCst) {
+            println!("[dry-run] {command}");
+            self.last_exit_code = 0;
+            self.last_success = true;
+            return 0.0;
+        }
+
         let status = if cfg!(target_os = "windows") {
             Command::new("cmd")
                 .args(["/C", &command])
@@ -139,6 +172,12 @@ impl Shell {
 
     fn spawn(&self, command: WrenString) -> bool {
         let command = command.into_string().unwrap_or_default();
+
+        if DRY_RUN.load(Ordering::SeqCst) {
+            println!("[dry-run] {command}");
+            return true;
+        }
+
         let result = if cfg!(target_os = "windows") {
             Command::new("cmd").args(["/C", &command]).spawn()
         } else {

@@ -2,7 +2,7 @@ pub mod args;
 mod env;
 mod file;
 pub mod print;
-mod process;
+pub mod process;
 mod str;
 
 use ruwren::ModuleLibrary;
