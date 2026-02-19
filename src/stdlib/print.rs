@@ -400,24 +400,16 @@ fn find_custom_level(name: &str) -> Option<CustomLevel> {
 }
 
 fn resolve_level(level_name_str: &str) -> (u8, String, Option<String>) {
-    let normalized = level_name_str.to_lowercase();
-    match normalized.as_str() {
-        "trace" => (0, level_name(0).to_string(), None),
-        "debug" => (1, level_name(1).to_string(), None),
-        "info" => (2, level_name(2).to_string(), None),
-        "warn" | "warning" => (3, level_name(3).to_string(), None),
-        "error" => (4, level_name(4).to_string(), None),
-        _ => {
-            if let Some(custom) = find_custom_level(level_name_str) {
-                (
-                    custom.priority,
-                    format!("{:<5}", custom.name.to_uppercase()),
-                    Some(custom.color_name),
-                )
-            } else {
-                (5, format!("{:<5}", level_name_str.to_uppercase()), None)
-            }
-        }
+    if let Some(custom) = find_custom_level(level_name_str) {
+        (
+            custom.priority,
+            format!("{:<5}", custom.name.to_uppercase()),
+            Some(custom.color_name),
+        )
+    } else {
+        // Match Log.custom fallback behavior: unknown levels are treated as
+        // custom priority (above error), which keeps them visible by default.
+        (5, format!("{:<5}", level_name_str.to_uppercase()), None)
     }
 }
 
