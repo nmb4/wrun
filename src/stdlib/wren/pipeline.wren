@@ -17,7 +17,7 @@
 //     .run()
 
 import "wrun/process" for Shell, Process
-import "wrun/print" for Log, Print
+import "wrun/print" for Log
 import "wrun/file" for File
 import "wrun/env" for Env
 import "wrun/str" for Str
@@ -443,18 +443,7 @@ class Pipeline {
         kv["eta"] = "unknown"
       }
 
-      var elapsedText = kv["elapsed"]
-      var etaText = kv["eta"]
-      var progressText = kv["progress"]
-
-      var status = "[build %(task.name)] elapsed %(elapsedText)"
-      if (etaText != null) {
-        status = "%(status) | eta %(etaText)"
-      }
-      if (progressText != null) {
-        status = "%(status) | %(progressText)"
-      }
-      Print.live(status, "brightBlack")
+      Log.live(task.logLevel, "Running build step", kv)
     }
   }
 

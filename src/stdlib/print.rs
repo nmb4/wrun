@@ -399,6 +399,48 @@ fn find_custom_level(name: &str) -> Option<CustomLevel> {
     }
 }
 
+fn resolve_level(level_name_str: &str) -> (u8, String, Option<String>) {
+    let normalized = level_name_str.to_lowercase();
+    match normalized.as_str() {
+        "trace" => (0, level_name(0).to_string(), None),
+        "debug" => (1, level_name(1).to_string(), None),
+        "info" => (2, level_name(2).to_string(), None),
+        "warn" | "warning" => (3, level_name(3).to_string(), None),
+        "error" => (4, level_name(4).to_string(), None),
+        _ => {
+            if let Some(custom) = find_custom_level(level_name_str) {
+                (
+                    custom.priority,
+                    format!("{:<5}", custom.name.to_uppercase()),
+                    Some(custom.color_name),
+                )
+            } else {
+                (5, format!("{:<5}", level_name_str.to_uppercase()), None)
+            }
+        }
+    }
+}
+
+fn log_live_message(level: u8, level_str: &str, msg: &str, kv_str: &str, custom_color: Option<&str>) {
+    if !should_log_terminal(level) {
+        return;
+    }
+
+    let time_terminal = Local::now().format("%H:%M").to_string();
+    let badge_str = badge(level, level_str, custom_color);
+    let fg = fg_code(level, custom_color);
+    let kv_formatted = format_kv(kv_str, fg);
+
+    let mut out = stdout();
+    let _ = write!(
+        out,
+        "{}{}\x1b[0;39;2m{}\x1b[0;39m  {}{}\x1b[0m",
+        CLEAR_LINE, badge_str, time_terminal, msg, kv_formatted
+    );
+    let _ = out.flush();
+    LIVE_LINE_ACTIVE.store(true, Ordering::SeqCst);
+}
+
 // ============== Log Class ==============
 
 #[derive(WrenObject, Default)]
@@ -500,6 +542,21 @@ impl LogInternal {
             let padded_name = format!("{:<5}", level_name_str.to_uppercase());
             log_message(5, &padded_name, &msg, &kv, None);
         }
+    }
+
+    fn live(&self, level_name_str: WrenString, msg: WrenString) {
+        let level_name_str = level_name_str.into_string().unwrap_or_default();
+        let msg = msg.into_string().unwrap_or_default();
+        let (level, level_str, custom_color) = resolve_level(&level_name_str);
+        log_live_message(level, &level_str, &msg, "", custom_color.as_deref());
+    }
+
+    fn liveKv(&self, level_name_str: WrenString, msg: WrenString, kv: WrenString) {
+        let level_name_str = level_name_str.into_string().unwrap_or_default();
+        let msg = msg.into_string().unwrap_or_default();
+        let kv = kv.into_string().unwrap_or_default();
+        let (level, level_str, custom_color) = resolve_level(&level_name_str);
+        log_live_message(level, &level_str, &msg, &kv, custom_color.as_deref());
     }
 
     // Configuration

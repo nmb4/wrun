@@ -33,6 +33,8 @@ foreign class LogInternal {
     foreign static errorKv(msg, kv)
     foreign static custom(level, msg)
     foreign static customKv(level, msg, kv)
+    foreign static live(level, msg)
+    foreign static liveKv(level, msg, kv)
 
     // Configuration
     foreign static setFile(path)
@@ -60,6 +62,8 @@ class Log {
 
     static custom(level, msg) { LogInternal.custom(level, msg) }
     static custom(level, msg, kv) { LogInternal.customKv(level, msg, Log.serializeKv_(kv)) }
+    static live(level, msg) { LogInternal.live(level, msg) }
+    static live(level, msg, kv) { LogInternal.liveKv(level, msg, Log.serializeKv_(kv)) }
 
     // Configuration
     static setFile(path) { LogInternal.setFile(path) }

@@ -113,6 +113,8 @@ import "wrun/print" for Log
 | `Log.error(msg, kv)` | Log error with Map of key-value pairs |
 | `Log.custom(level, msg)` | Log with custom level string |
 | `Log.custom(level, msg, kv)` | Log custom level with key-value Map |
+| `Log.live(level, msg)` | Redraw one live terminal log line with normal log styling |
+| `Log.live(level, msg, kv)` | Live log line with key-value Map formatting |
 
 **Key-Value Format**: Pass a Wren `Map` which gets serialized to `key=value\0key=value` format.
 
