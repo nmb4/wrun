@@ -509,7 +509,7 @@ class NativeFileWatcher {
     construct new(path) {
         _root = Path.absolute(path)
         _recursive = true
-        _runMode = "poll"
+        _runMode = "wait"
         _pollInterval = 0.10
         _waitTimeout = 0.50
         _fallbackPolling = true
@@ -535,6 +535,19 @@ class NativeFileWatcher {
 
     static watch(path, handler) {
         return NativeFileWatcher.new(path).onChange(handler).start()
+    }
+
+    static watchDir(path) {
+        return NativeFileWatcher.new(path)
+            .recursive(true)
+            .start()
+    }
+
+    static watchDir(path, handler) {
+        return NativeFileWatcher.new(path)
+            .recursive(true)
+            .onChange(handler)
+            .start()
     }
 
     static watchFile(path) {
@@ -1139,6 +1152,14 @@ class Watcher {
 
     static watch(path, handler) {
         return NativeFileWatcher.watch(path, handler)
+    }
+
+    static watchDir(path) {
+        return NativeFileWatcher.watchDir(path)
+    }
+
+    static watchDir(path, handler) {
+        return NativeFileWatcher.watchDir(path, handler)
     }
 
     static watchFile(path) {

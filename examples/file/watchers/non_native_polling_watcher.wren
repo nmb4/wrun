@@ -7,15 +7,7 @@ var watchRoot = "."
 var maxEvents = 6
 var seen = 0
 
-var watcher = FileWatcher.new(watchRoot)
-    .recursive(true)
-    .diffGranularity("line")
-    .diffAlgorithm("myers")
-    .includePatch(true)
-    .includePrettyDiff(true)
-    .pollInterval(0.2)
-
-watcher.onChange(Fn.new { |event|
+var watcher = FileWatcher.watch(watchRoot, Fn.new { |event|
     seen = seen + 1
     var diff = event["contentDiff"]
     Log.info("Polling watcher event", {
@@ -37,10 +29,11 @@ watcher.onChange(Fn.new { |event|
         Log.info("Watcher stopped", {"reason": "max events reached", "maxEvents": maxEvents})
     }
 })
+    .pollInterval(0.2)
 
 Log.info("Polling watcher started", {
     "root": watcher.root,
     "recursive": true,
     "maxEvents": maxEvents
 })
-watcher.start().run()
+watcher.run()

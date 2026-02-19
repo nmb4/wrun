@@ -5,17 +5,8 @@ var watchRoot = "."
 var maxEvents = 8
 var seen = 0
 
-var watcher = NativeFileWatcher.new(watchRoot)
-    .recursive(true)
-    .mode("poll")
-    .diffGranularity("line")
-    .diffAlgorithm("myers")
-    .includePatch(true)
-    .includePrettyDiff(true)
-    .pollInterval(0.1)
-    .fallbackPolling(true)
-
-watcher.onChange(Fn.new { |event|
+var watcher = null
+watcher = NativeFileWatcher.watchDir(watchRoot, Fn.new { |event|
     seen = seen + 1
     var diff = event["contentDiff"]
     Log.info("Native watcher event (poll mode)", {
@@ -41,6 +32,8 @@ watcher.onChange(Fn.new { |event|
         })
     }
 })
+    .mode("poll")
+    .pollInterval(0.1)
 
 Log.info("Native watcher started (poll mode)", {
     "root": watcher.root,
@@ -48,5 +41,4 @@ Log.info("Native watcher started (poll mode)", {
     "recursive": true,
     "maxEvents": maxEvents
 })
-
-watcher.start().run()
+watcher.run()

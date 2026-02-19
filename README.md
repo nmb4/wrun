@@ -98,9 +98,8 @@ System.print(Diff.pretty("demo.txt", before, after, "line", "patience")) // algo
 var patch = Diff.patch("demo.txt", before, after)
 var applyResult = Diff.applyPatchResult(before, patch) // ["ok", "..."] or ["error", "..."]
 
-// Watch changes (default: native-backed watcher alias)
-var watcher = Watcher
-    .watch(".", Fn.new { |event|
+// Watch a directory (default: native-backed watcher alias)
+var watcher = Watcher.watchDir(".", Fn.new { |event|
         System.print("%(event[\"kind\"]) %(event[\"path\"])")
         if (event["prettyDiff"] != null) {
             System.print(event["prettyDiff"]) // ANSI colored output
@@ -110,12 +109,6 @@ var watcher = Watcher
             System.print("  +%(diff[\"addedCount\"]) -%(diff[\"removedCount\"]) at line %(diff[\"startLine\"])")
         }
     })
-    .recursive(true)
-    .diffGranularity("line")
-    .diffAlgorithm("myers")
-    .includePrettyDiff(true)
-    .includePatch(true)
-    .pollInterval(0.2)
 
 watcher.run()
 
@@ -133,7 +126,8 @@ var fileWatcher = Watcher.watchFile("config/app.env", Fn.new { |event|
 })
 
 // Native OS-backed watcher (via notify backend)
-// Falls back to metadata polling until native events are observed.
+// Defaults are now native + wait mode + fallbackPolling=true.
+// You can still override to poll mode explicitly when needed.
 var nativeWatcher = NativeFileWatcher
     .watch(".", Fn.new { |event|
         System.print("native %(event[\"kind\"]) %(event[\"path\"])")
@@ -145,14 +139,7 @@ var nativeWatcher = NativeFileWatcher
             System.print("  +%(diff[\"addedCount\"]) -%(diff[\"removedCount\"]) at line %(diff[\"startLine\"])")
         }
     })
-    .recursive(true)
-    .diffGranularity("line")
-    .diffAlgorithm("myers")
-    .includePrettyDiff(true)
-    .includePatch(true)
-    .mode("wait")        // "wait" (blocking) or "poll"
-    .waitTimeout(0.5)    // blocking wait timeout in seconds
-    .fallbackPolling(true)
+    .mode("poll")
     .pollInterval(0.1)
 
 nativeWatcher.run()
@@ -224,6 +211,7 @@ cargo run --quiet -- examples/file/smoke/native_poll_mode.wren
 cargo run --quiet -- examples/file/smoke/native_wait_mode.wren
 cargo run --quiet -- examples/file/smoke/default_watcher_alias_native.wren
 cargo run --quiet -- examples/file/smoke/default_watch_file_helper.wren
+cargo run --quiet -- examples/file/smoke/default_watch_dir_helper.wren
 cargo run --quiet -- examples/file/smoke/non_native_content_diff.wren
 cargo run --quiet -- examples/file/smoke/non_native_recursive_mode.wren
 ```

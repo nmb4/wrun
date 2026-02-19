@@ -5,17 +5,8 @@ var watchRoot = "."
 var maxEvents = 6
 var seen = 0
 
-var watcher = Watcher.new(watchRoot)
-    .recursive(true)
-    .mode("wait")
-    .waitTimeout(0.5)
-    .diffGranularity("line")
-    .diffAlgorithm("myers")
-    .includePatch(true)
-    .includePrettyDiff(true)
-    .pollInterval(0.1)
-
-watcher.onChange(Fn.new { |event|
+var watcher = null
+watcher = Watcher.watchDir(watchRoot, Fn.new { |event|
     seen = seen + 1
     var diff = event["contentDiff"]
     Log.info("Default watcher event (native wait mode)", {
@@ -44,4 +35,4 @@ Log.info("Default watcher started (wait mode)", {
     "recursive": true,
     "maxEvents": maxEvents
 })
-watcher.start().run()
+watcher.run()

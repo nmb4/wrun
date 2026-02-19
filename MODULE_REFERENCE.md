@@ -304,6 +304,8 @@ Use `FileWatcher` explicitly when you want non-native snapshot polling.
 | `Watcher.new(path)` | `NativeFileWatcher` | Create native-backed watcher instance |
 | `Watcher.watch(path)` | `NativeFileWatcher` | Convenience constructor + start |
 | `Watcher.watch(path, handler)` | `NativeFileWatcher` | Convenience constructor with handler + start |
+| `Watcher.watchDir(path)` | `NativeFileWatcher` | Watch a directory with native-backed defaults |
+| `Watcher.watchDir(path, handler)` | `NativeFileWatcher` | Watch a directory and register handler |
 | `Watcher.watchFile(path)` | `NativeFileWatcher` | Watch a single file with native-backed defaults |
 | `Watcher.watchFile(path, handler)` | `NativeFileWatcher` | Watch a single file and register handler |
 
@@ -368,6 +370,8 @@ If native events are unavailable, it can temporarily fall back to metadata polli
 | `NativeFileWatcher.new(path)` | `NativeFileWatcher` | Create watcher rooted at file/directory path |
 | `NativeFileWatcher.watch(path)` | `NativeFileWatcher` | Convenience constructor + start |
 | `NativeFileWatcher.watch(path, handler)` | `NativeFileWatcher` | Convenience constructor with handler + start |
+| `NativeFileWatcher.watchDir(path)` | `NativeFileWatcher` | Convenience directory watcher (native defaults) |
+| `NativeFileWatcher.watchDir(path, handler)` | `NativeFileWatcher` | Convenience directory watcher with handler |
 | `NativeFileWatcher.watchFile(path)` | `NativeFileWatcher` | Convenience single-file watcher (parent dir + path filter) |
 | `NativeFileWatcher.watchFile(path, handler)` | `NativeFileWatcher` | Convenience single-file watcher with handler |
 | `onChange(handler)` | `NativeFileWatcher` | Register handler (`Fiber` or callable with `.call(event)`) |
@@ -375,7 +379,7 @@ If native events are unavailable, it can temporarily fall back to metadata polli
 | `recursive(enabled)` | `NativeFileWatcher` | Enable/disable recursive watching |
 | `onlyPath(path)` | `NativeFileWatcher` | Filter emitted events to one absolute file path |
 | `clearPathFilter()` | `NativeFileWatcher` | Remove path filter |
-| `mode(name)` | `NativeFileWatcher` | Set run loop model: `"poll"` or `"wait"` |
+| `mode(name)` | `NativeFileWatcher` | Set run loop model: `"poll"` or `"wait"` (default: `"wait"`) |
 | `blockingWait(enabled)` | `NativeFileWatcher` | Convenience: `true` => `"wait"`, `false` => `"poll"` |
 | `pollInterval(seconds)` | `NativeFileWatcher` | Sleep duration used by `run()` loop (default `0.10`) |
 | `waitTimeout(seconds)` | `NativeFileWatcher` | Blocking wait timeout used in `"wait"` mode (default `0.50`) |
@@ -436,17 +440,10 @@ var patch = Diff.patch("demo.txt", before, after)
 var applied = Diff.applyPatchResult(before, patch)
 
 // Default watcher (native-backed alias)
-var watcher = Watcher
-    .watch(".", Fn.new { |event|
+var watcher = Watcher.watchDir(".", Fn.new { |event|
         System.print("%(event[\"kind\"]): %(event[\"path\"])")
         if (event["prettyDiff"] != null) System.print(event["prettyDiff"])
     })
-    .recursive(true)
-    .diffGranularity("line")
-    .diffAlgorithm("myers")
-    .includePrettyDiff(true)
-    .includePatch(true)
-    .pollInterval(0.2)
 
 watcher.run()
 
@@ -463,20 +460,20 @@ var fileWatcher = Watcher.watchFile("config/app.env", Fn.new { |event|
     }
 })
 
-// Native OS-backed watcher
+// Single-file helper (native-backed alias + path filter)
+var fileWatcher = Watcher.watchFile("config/app.env", Fn.new { |event|
+    if (event["contentChanged"]) {
+        System.print("config changed: %(event[\"path\"])")
+    }
+})
+
+// Native OS-backed watcher (explicit override to poll mode)
 var nativeWatcher = NativeFileWatcher
     .watch(".", Fn.new { |event|
         System.print("%(event[\"kind\"]): %(event[\"path\"])")
         if (event["prettyDiff"] != null) System.print(event["prettyDiff"])
     })
-    .recursive(true)
-    .mode("wait")
-    .waitTimeout(0.5)
-    .fallbackPolling(true)
-    .diffGranularity("line")
-    .diffAlgorithm("myers")
-    .includePrettyDiff(true)
-    .includePatch(true)
+    .mode("poll")
     .pollInterval(0.1)
 
 nativeWatcher.run()

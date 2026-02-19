@@ -33,6 +33,7 @@ cargo run --quiet -- examples/file/smoke/native_poll_mode.wren
 cargo run --quiet -- examples/file/smoke/native_wait_mode.wren
 cargo run --quiet -- examples/file/smoke/default_watcher_alias_native.wren
 cargo run --quiet -- examples/file/smoke/default_watch_file_helper.wren
+cargo run --quiet -- examples/file/smoke/default_watch_dir_helper.wren
 ```
 
 Native strict probes can print `SKIP` if native content events are unavailable on the
