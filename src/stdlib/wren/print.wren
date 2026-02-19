@@ -3,12 +3,18 @@ foreign class PrintInternal {
     foreign static eprint(msg)
     foreign static cprint(msg)
     foreign static cprintColor(msg, color)
+    foreign static live(msg)
+    foreign static liveColor(msg, color)
+    foreign static liveDone()
 }
 
 class Print {
     static eprint(msg) { PrintInternal.eprint(msg) }
     static cprint(msg) { PrintInternal.cprint(msg) }
     static cprint(msg, color) { PrintInternal.cprintColor(msg, color) }
+    static live(msg) { PrintInternal.live(msg) }
+    static live(msg, color) { PrintInternal.liveColor(msg, color) }
+    static liveDone() { PrintInternal.liveDone() }
 }
 
 foreign class LogInternal {

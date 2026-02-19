@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 static DRY_RUN: AtomicBool = AtomicBool::new(false);
 static NEXT_HANDLE: AtomicU64 = AtomicU64::new(1);
@@ -55,6 +55,13 @@ impl Process {
         }
         std::thread::sleep(Duration::from_secs_f64(seconds));
         true
+    }
+
+    fn now(&self) -> f64 {
+        match SystemTime::now().duration_since(UNIX_EPOCH) {
+            Ok(d) => d.as_secs_f64(),
+            Err(_) => 0.0,
+        }
     }
 }
 

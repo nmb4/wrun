@@ -26,6 +26,9 @@ cargo run --quiet -- examples/file/watchers/non_native_polling_watcher.wren
 cargo run --quiet -- examples/file/diff/pretty_diff_groups.wren
 cargo run --quiet -- examples/file/diff/patch_roundtrip.wren
 
+# Pipeline build-step ETA demo
+cargo run --quiet -- examples/process/pipeline_build_step_eta.wren
+
 # Smoke tests
 cargo run --quiet -- examples/file/smoke/non_native_content_diff.wren
 cargo run --quiet -- examples/file/smoke/non_native_recursive_mode.wren

@@ -16,8 +16,11 @@
 //     .onSuccess("readme") { |result| File.write("README.md", result.stdout) }
 //     .run()
 
-import "wrun/process" for Shell
-import "wrun/print" for Log
+import "wrun/process" for Shell, Process
+import "wrun/print" for Log, Print
+import "wrun/file" for File
+import "wrun/env" for Env
+import "wrun/str" for Str
 
 // Result of a completed task
 class TaskResult {
@@ -51,6 +54,13 @@ class Task {
     _onSuccessCallback = null
     _onFailureCallback = null
     _logLevel = "trace"     // Log level for this task
+    _isBuildStep = false
+    _timingKey = null
+    _liveTimer = false
+    _startedAt = 0
+    _lastTimerSecond = -1
+    _expectedSeconds = null
+    _historyCount = 0
   }
 
   name { _name }
@@ -67,6 +77,17 @@ class Task {
   result=(v) { _result = v }
   success { _result != null && _result.success }
   logLevel { _logLevel }
+  isBuildStep { _isBuildStep }
+  timingKey { _timingKey }
+  liveTimer { _liveTimer }
+  startedAt { _startedAt }
+  startedAt=(v) { _startedAt = v }
+  lastTimerSecond { _lastTimerSecond }
+  lastTimerSecond=(v) { _lastTimerSecond = v }
+  expectedSeconds { _expectedSeconds }
+  expectedSeconds=(v) { _expectedSeconds = v }
+  historyCount { _historyCount }
+  historyCount=(v) { _historyCount = v }
 
   // Add a dependency - this task runs after the named task
   after(taskName) {
@@ -86,6 +107,28 @@ class Task {
   // Set log level for this task: "trace", "debug", "info", "warn", "error", or custom
   log(level) {
     _logLevel = level
+    return this
+  }
+
+  // Mark this task as a build step and enable timing persistence + ETA.
+  buildStep() {
+    _isBuildStep = true
+    _timingKey = _name
+    _liveTimer = true
+    return this
+  }
+
+  // Use a custom key when sharing timing history across multiple task names.
+  buildStep(key) {
+    _isBuildStep = true
+    _timingKey = key
+    _liveTimer = true
+    return this
+  }
+
+  // Toggle live elapsed/ETA logging for build steps.
+  liveTimer(enabled) {
+    _liveTimer = enabled
     return this
   }
 
@@ -123,6 +166,7 @@ class Pipeline {
     _verbose = true       // log task start/completion
     _results = {}         // name -> TaskResult
     _aborted = false
+    _timingsDir = "%(Env.home())/.wrun/pipeline_timings"
   }
 
   // Add a task with no dependencies (runs immediately)
@@ -182,6 +226,22 @@ class Pipeline {
     return this
   }
 
+  // Mark an existing task as a build step with timing persistence + ETA.
+  buildStep(name) {
+    if (_tasks.containsKey(name)) {
+      _tasks[name].buildStep()
+    }
+    return this
+  }
+
+  // Mark an existing task as a build step with a custom timing key.
+  buildStep(name, timingKey) {
+    if (_tasks.containsKey(name)) {
+      _tasks[name].buildStep(timingKey)
+    }
+    return this
+  }
+
   // Set the final command that runs after all tasks
   // mode: "success" (only if all succeeded), "always", "failure" (only if something failed)
   finally(command) {
@@ -197,6 +257,12 @@ class Pipeline {
   // Set poll interval in seconds
   pollInterval(seconds) {
     _pollInterval = seconds
+    return this
+  }
+
+  // Set where build-step timing history is persisted.
+  timingsDir(path) {
+    _timingsDir = path
     return this
   }
 
@@ -258,9 +324,155 @@ class Pipeline {
     return false
   }
 
+  ensureTimingsDir_() {
+    if (File.isDirectory(_timingsDir)) return true
+    return File.mkdir(_timingsDir)
+  }
+
+  sanitizeTimingKey_(key) {
+    var out = ""
+    for (ch in key) {
+      if (Str.isAlphaNumeric(ch) || ch == "-" || ch == "_") {
+        out = "%(out)%(ch)"
+      } else {
+        out = "%(out)_"
+      }
+    }
+    if (out == "") return "task"
+    return out
+  }
+
+  timingFilePath_(task) {
+    var rawKey = task.timingKey != null ? task.timingKey : task.name
+    var safeKey = sanitizeTimingKey_(rawKey)
+    return "%(_timingsDir)/%(safeKey).timings"
+  }
+
+  loadDurations_(task) {
+    var values = []
+    if (!ensureTimingsDir_()) return values
+
+    var path = timingFilePath_(task)
+    if (!File.exists(path)) return values
+
+    var content = File.read(path)
+    if (content == null || content == "") return values
+
+    for (line in Str.lines(content)) {
+      var t = Str.trim(line)
+      if (t == "") continue
+      var n = Num.fromString(t)
+      if (n != null && n >= 0) {
+        values.add(n)
+      }
+    }
+
+    return values
+  }
+
+  average_(values) {
+    if (values.count == 0) return null
+    var sum = 0
+    for (v in values) {
+      sum = sum + v
+    }
+    return sum / values.count
+  }
+
+  persistDuration_(task, durationSeconds) {
+    if (!ensureTimingsDir_()) {
+      if (_verbose) Log.warn("Could not create timing directory", {"path": _timingsDir})
+      return
+    }
+
+    var path = timingFilePath_(task)
+    var line = "%(durationSeconds)\n"
+    if (File.exists(path)) {
+      if (!File.append(path, line) && _verbose) {
+        Log.warn("Failed to append build timing", {"task": task.name, "path": path})
+      }
+    } else {
+      if (!File.write(path, line) && _verbose) {
+        Log.warn("Failed to write build timing", {"task": task.name, "path": path})
+      }
+    }
+  }
+
+  formatDuration_(seconds) {
+    var safe = seconds
+    if (safe < 0) safe = 0
+
+    var whole = safe.floor
+    var mins = (whole / 60).floor
+    var secs = whole % 60
+    var deci = ((safe - whole) * 10).floor
+    var secsText = secs < 10 ? "0%(secs)" : "%(secs)"
+    return "%(mins)m %(secsText).%(deci)s"
+  }
+
+  updateLiveTimers_() {
+    if (!_verbose) return
+
+    for (name in _order) {
+      var task = _tasks[name]
+      if (!task.isBuildStep) continue
+      if (!task.liveTimer) continue
+      if (!task.started || task.done) continue
+      if (task.handle == 0 || task.handle == null) continue
+
+      var elapsed = Process.now() - task.startedAt
+      if (elapsed < 0) elapsed = 0
+      var tick = elapsed.floor
+      if (tick <= task.lastTimerSecond) continue
+
+      task.lastTimerSecond = tick
+
+      var kv = {
+        "task": task.name,
+        "elapsed": formatDuration_(elapsed)
+      }
+
+      if (task.expectedSeconds != null && task.expectedSeconds > 0) {
+        var remaining = task.expectedSeconds - elapsed
+        if (remaining < 0) remaining = 0
+        var progress = ((elapsed / task.expectedSeconds) * 100).floor
+        if (progress > 100) progress = 100
+        kv["eta"] = formatDuration_(remaining)
+        kv["progress"] = "%(progress) pct"
+      } else {
+        kv["eta"] = "unknown"
+      }
+
+      var elapsedText = kv["elapsed"]
+      var etaText = kv["eta"]
+      var progressText = kv["progress"]
+
+      var status = "[build %(task.name)] elapsed %(elapsedText)"
+      if (etaText != null) {
+        status = "%(status) | eta %(etaText)"
+      }
+      if (progressText != null) {
+        status = "%(status) | %(progressText)"
+      }
+      Print.live(status, "brightBlack")
+    }
+  }
+
   // Start a task
   startTask_(task) {
     task.started = true
+    task.startedAt = Process.now()
+    task.lastTimerSecond = -1
+
+    if (task.isBuildStep) {
+      var history = loadDurations_(task)
+      task.historyCount = history.count
+      task.expectedSeconds = average_(history)
+    } else {
+      task.historyCount = 0
+      task.expectedSeconds = null
+    }
+
     task.handle = Shell.spawnAsync(task.command)
     if (task.handle == 0) {
       // Failed to spawn
@@ -268,13 +480,30 @@ class Pipeline {
       task.result = TaskResult.new(task.name, -1, "", "Failed to spawn process")
       if (_verbose) Log.error("Failed to start task", {"task": task.name})
     } else {
-      if (_verbose) Log.custom(task.logLevel, "Started", {"task": task.name})
+      if (_verbose) {
+        if (task.isBuildStep) {
+          var kv = {
+            "task": task.name,
+            "samples": task.historyCount
+          }
+          if (task.expectedSeconds != null) {
+            kv["eta"] = formatDuration_(task.expectedSeconds)
+          } else {
+            kv["eta"] = "unknown"
+          }
+          Log.custom(task.logLevel, "Started build step", kv)
+        } else {
+          Log.custom(task.logLevel, "Started", {"task": task.name})
+        }
+      }
     }
   }
 
   // Complete a task
   completeTask_(task) {
     task.done = true
+    var duration = Process.now() - task.startedAt
+    if (duration < 0) duration = 0
     var code = Shell.getExitCode(task.handle)
     var stdout = Shell.getStdout(task.handle)
     var stderr = Shell.getStderr(task.handle)
@@ -283,10 +512,34 @@ class Pipeline {
     task.result = TaskResult.new(task.name, code, stdout, stderr)
     _results[task.name] = task.result
     
+    if (task.isBuildStep) {
+      persistDuration_(task, duration)
+    }
+
     if (task.success) {
-      if (_verbose) Log.custom(task.logLevel, "Completed", {"task": task.name, "exitCode": code})
+      if (_verbose) {
+        if (task.isBuildStep) {
+          Log.custom(task.logLevel, "Completed build step", {
+            "task": task.name,
+            "exitCode": code,
+            "duration": formatDuration_(duration)
+          })
+        } else {
+          Log.custom(task.logLevel, "Completed", {"task": task.name, "exitCode": code})
+        }
+      }
     } else {
-      if (_verbose) Log.warn("Failed", {"task": task.name, "exitCode": code})
+      if (_verbose) {
+        if (task.isBuildStep) {
+          Log.warn("Failed build step", {
+            "task": task.name,
+            "exitCode": code,
+            "duration": formatDuration_(duration)
+          })
+        } else {
+          Log.warn("Failed", {"task": task.name, "exitCode": code})
+        }
+      }
     }
     
     task.invokeCallbacks()
@@ -322,6 +575,8 @@ class Pipeline {
           }
         }
       }
+
+      updateLiveTimers_()
 
       // Small sleep to avoid busy-waiting
       if (!allDone_()) {

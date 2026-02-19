@@ -4,7 +4,8 @@ use chrono::Local;
 use ruwren::foreign_v2::WrenString;
 use ruwren::{wren_impl, ModuleLibrary, WrenObject};
 use std::fs::OpenOptions;
-use std::io::Write;
+use std::io::{Write, stdout};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::RwLock;
 
 // ANSI color codes using standard 16-color palette
@@ -27,6 +28,9 @@ const FG_BRIGHT_BLUE: &str = "\x1b[94m";
 const FG_BRIGHT_MAGENTA: &str = "\x1b[95m";
 const FG_BRIGHT_CYAN: &str = "\x1b[96m";
 const FG_BRIGHT_WHITE: &str = "\x1b[97m";
+const CLEAR_LINE: &str = "\r\x1b[2K";
+
+static LIVE_LINE_ACTIVE: AtomicBool = AtomicBool::new(false);
 
 fn badge(level: u8, level_name: &str, custom_color: Option<&str>) -> String {
     let bg = bg_code(level, custom_color);
@@ -139,6 +143,19 @@ fn ansi_fg_code(name: &str) -> u8 {
     }
 }
 
+fn clear_live_line(newline: bool) {
+    if !LIVE_LINE_ACTIVE.swap(false, Ordering::SeqCst) {
+        return;
+    }
+    let mut out = stdout();
+    if newline {
+        let _ = write!(out, "{}\n", CLEAR_LINE);
+    } else {
+        let _ = write!(out, "{}", CLEAR_LINE);
+    }
+    let _ = out.flush();
+}
+
 // ============== Print Class ==============
 
 #[derive(WrenObject, Default)]
@@ -147,20 +164,45 @@ pub struct PrintInternal;
 #[wren_impl]
 impl PrintInternal {
     fn eprint(&self, msg: WrenString) {
+        clear_live_line(false);
         let msg = msg.into_string().unwrap_or_default();
         eprintln!("{}", msg);
     }
 
     fn cprint(&self, msg: WrenString) {
+        clear_live_line(false);
         let msg = msg.into_string().unwrap_or_default();
         println!("{}{}{}", FG_GREEN, msg, RESET);
     }
 
     fn cprintColor(&self, msg: WrenString, color: WrenString) {
+        clear_live_line(false);
         let msg = msg.into_string().unwrap_or_default();
         let color_name = color.into_string().unwrap_or_default();
         let color_code = ansi_color(&color_name);
         println!("{}{}{}", color_code, msg, RESET);
+    }
+
+    fn live(&self, msg: WrenString) {
+        let msg = msg.into_string().unwrap_or_default();
+        let mut out = stdout();
+        let _ = write!(out, "{}{}", CLEAR_LINE, msg);
+        let _ = out.flush();
+        LIVE_LINE_ACTIVE.store(true, Ordering::SeqCst);
+    }
+
+    fn liveColor(&self, msg: WrenString, color: WrenString) {
+        let msg = msg.into_string().unwrap_or_default();
+        let color_name = color.into_string().unwrap_or_default();
+        let color_code = ansi_color(&color_name);
+        let mut out = stdout();
+        let _ = write!(out, "{}{}{}{}", CLEAR_LINE, color_code, msg, RESET);
+        let _ = out.flush();
+        LIVE_LINE_ACTIVE.store(true, Ordering::SeqCst);
+    }
+
+    fn liveDone(&self) {
+        clear_live_line(true);
     }
 }
 
@@ -318,6 +360,7 @@ fn log_message(level: u8, level_str: &str, msg: &str, kv_str: &str, custom_color
 
     // Terminal output format: LEVEL ▌ HH:MM(dim)  message
     if should_log_terminal(level) {
+        clear_live_line(false);
         let badge_str = badge(level, level_str, custom_color);
         let fg = fg_code(level, custom_color);
         let kv_formatted = format_kv(kv_str, fg);

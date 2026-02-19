@@ -33,11 +33,21 @@ import "wrun/print" for Print
 | `Print.eprint(msg)` | Print message to stderr without newline |
 | `Print.cprint(msg)` | Print message to stdout without newline |
 | `Print.cprint(msg, color)` | Print colored message to stdout |
+| `Print.live(msg)` | Redraw a single live status line in place (no newline) |
+| `Print.live(msg, color)` | Same as `live(msg)` with color |
+| `Print.liveDone()` | Clear the live status line and move to next line |
 
 **Color Values** (passed as string to `cprint`):
 - `"black"`, `"red"`, `"green"`, `"yellow"`, `"blue"`, `"magenta"`, `"cyan"`, `"white"`
 - Bright variants: `"brightBlack"`, `"brightRed"`, etc.
 - Reset: `"reset"`
+
+**Live Line Example**:
+```wren
+Print.live("Building... 42%", "brightBlack")
+// ...later
+Print.liveDone()
+```
 
 ---
 
@@ -573,6 +583,7 @@ Process-level operations and current working directory.
 | `Process.chdir(path)` | `Bool` | Changes directory, returns `true` on success |
 | `Process.exit(code)` | (never returns) | Exits process with code (0-255) |
 | `Process.sleep(seconds)` | `Bool` | Sleeps current process for given seconds |
+| `Process.now()` | `Num` | Current Unix timestamp in seconds (wall clock) |
 
 ### Shell Class
 
@@ -633,12 +644,15 @@ The main orchestrator for running commands with dependencies.
 | `after(dep, name, command)` | `Pipeline` | Add a task that runs after `dep` completes |
 | `afterAll(deps, name, command)` | `Pipeline` | Add a task that runs after all `deps` complete |
 | `configure(name)` | `Task` | Get a task for further configuration |
+| `buildStep(name)` | `Pipeline` | Mark task as a timed build step (persist duration history + ETA) |
+| `buildStep(name, timingKey)` | `Pipeline` | Mark task as timed build step with custom shared history key |
 | `onSuccess(name, fn)` | `Pipeline` | Set callback when task succeeds |
 | `onFail(name, fn)` | `Pipeline` | Set callback when task fails |
 | `failureMode(name, mode)` | `Pipeline` | Set failure behavior for a task |
 | `finally(command)` | `Pipeline` | Set final command to run after all tasks |
 | `finallyMode(mode)` | `Pipeline` | Set when finally runs: `"success"`, `"always"`, `"failure"` |
 | `pollInterval(seconds)` | `Pipeline` | Set poll interval (default: 0.05s) |
+| `timingsDir(path)` | `Pipeline` | Override build-step timing storage directory (default: `~/.wrun/pipeline_timings`) |
 | `verbose(enabled)` | `Pipeline` | Enable/disable logging (default: true) |
 | `run()` | `PipelineResult` | Execute the pipeline |
 
@@ -651,6 +665,14 @@ The main orchestrator for running commands with dependencies.
 - `"success"` (default): Run only if all tasks succeeded
 - `"always"`: Always run
 - `"failure"`: Run only if something failed
+
+**Build Step Timing**:
+- Mark a task as a build step via `Pipeline.buildStep(...)` or `Pipeline.configure(name).buildStep(...)`
+- Build step timings are persisted under `~/.wrun/pipeline_timings/`
+- ETA is calculated from prior run durations for that build-step key
+- Live timer is redrawn in-place while the build step is running (`elapsed`, `eta`, `progress`)
+- Set a custom store path with `Pipeline.timingsDir(...)` (useful for CI/sandboxed runs)
+- Disable live timer per task with `Pipeline.configure(name).liveTimer(false)`
 
 ### TaskResult Class
 
@@ -720,6 +742,16 @@ p.onSuccess("readme", Fn.new { |result|
 p.finally("git push")
 p.finallyMode("success")
 
+p.run()
+```
+
+```wren
+import "wrun/pipeline" for Pipeline
+
+var p = Pipeline.new()
+p.task("build", "cargo build --release")
+p.buildStep("build", "my-release-build")
+p.failureMode("build", "stop")
 p.run()
 ```
 

@@ -4,6 +4,7 @@ foreign class Process {
     foreign static chdir(path)
     foreign static exit(code)
     foreign static sleep(seconds)
+    foreign static now()
 }
 
 foreign class Shell {

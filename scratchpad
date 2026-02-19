@@ -26,6 +26,21 @@ so when a new event flies in it can be appended without having the output spamed
 that probably means there has to be a way to reset the text (maybe even just per line for something like a progressbar) on specific lines to then set the cursor and print out text again.
 
 
+tmux support somehow lol
+
+
 wrun (rewrun) issue:
 Compile Error (main:15): Error at '"examples/file/diff/diff/diff/diff/diff/diff/diff/diff/pretty_di...': Module variable is already defined.
 this error should show the variable name, not the variable value.
+
+
+okay i have another plan. please add some sort of toggle for the file watcher to ingore wrun generated log files out of the box and generally the support for excluding specified dirs or files.
+after that we can create some smoke tests to check how ctrl+c handling performs by creating a tmux instance that starts with a wrun script running watching the directory but before any file changes are detected we send a ctrl+c signal to that tmux and see how it handles that. incase it doesnt exit, we can always force kill the tmux pane so testing doesnt get blocked in that case.
+
+
+
+(not in binary but a script) a way to mark a step in the pipeline as a built step which meassures and stores how long all the previous runs took and creates an ETA for the step to finish based off of that previous runs. it also somehow should show a live timer.
+
+
+we need to add a oneliner to the readme like zellij or pkgx have one that doesnt install the binary but runs it once or caches it somehow.
+also a script "registry" running on my vercel domain with routes that resolve to scripts stored on that page somehow as a github repo of mine as source.
