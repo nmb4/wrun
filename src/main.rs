@@ -65,6 +65,10 @@ fn main() -> ExitCode {
         eprintln!("{}", e);
         return ExitCode::FAILURE;
     }
+    if let Err(e) = vm.interpret("wrun/str", stdlib_src.str) {
+        eprintln!("{}", e);
+        return ExitCode::FAILURE;
+    }
     if let Err(e) = vm.interpret("wrun/file", stdlib_src.file) {
         eprintln!("{}", e);
         return ExitCode::FAILURE;
@@ -74,10 +78,6 @@ fn main() -> ExitCode {
         return ExitCode::FAILURE;
     }
     if let Err(e) = vm.interpret("wrun/args", stdlib_src.args) {
-        eprintln!("{}", e);
-        return ExitCode::FAILURE;
-    }
-    if let Err(e) = vm.interpret("wrun/str", stdlib_src.str) {
         eprintln!("{}", e);
         return ExitCode::FAILURE;
     }

@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::time::Duration;
 
 static DRY_RUN: AtomicBool = AtomicBool::new(false);
 static NEXT_HANDLE: AtomicU64 = AtomicU64::new(1);
@@ -46,6 +47,14 @@ impl Process {
 
     fn exit(&self, code: f64) {
         std::process::exit(code as i32);
+    }
+
+    fn sleep(&self, seconds: f64) -> bool {
+        if !seconds.is_finite() || seconds <= 0.0 {
+            return false;
+        }
+        std::thread::sleep(Duration::from_secs_f64(seconds));
+        true
     }
 }
 
