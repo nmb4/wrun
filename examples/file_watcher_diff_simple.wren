@@ -1,38 +1,11 @@
-import "wrun/file" for File, FileWatcher
-import "wrun/process" for Process
+import "wrun/file" for Diff
 
-var path = ".diff_simple_example.txt"
-if (File.exists(path)) File.delete(path)
+var path = "examples/file_watcher_diff_simple.wren"
+var before = "line 01: keep\nline 02: keep\nline 03: old alpha\nline 04: keep\nline 05: keep\nline 06: keep\nline 07: keep\nline 08: keep\nline 09: keep\nline 10: keep\nline 11: keep\nline 12: keep\nline 13: keep\nline 14: keep\nline 15: keep\nline 16: keep\nline 17: keep\nline 18: old omega\nline 19: keep\nline 20: keep\n"
+var after = "line 01: keep\nline 02: keep\nline 03: new alpha\nline 04: keep\nline 05: keep\nline 06: keep\nline 07: keep\nline 08: keep\nline 09: keep\nline 10: keep\nline 11: keep\nline 12: keep\nline 13: keep\nline 14: keep\nline 15: keep\nline 16: keep\nline 17: keep\nline 18: new omega\nline 19: keep\nline 20: keep\n"
 
-File.write(path, "alpha\nbeta\ngamma")
+System.print("=== line granularity (myers) ===")
+System.print(Diff.pretty(path, before, after, "line", "myers"))
 
-var watcher = FileWatcher.new(path)
-    .recursive(false)
-    .start()
-
-File.write(path, "alpha\nbeta updated\ngamma")
-Process.sleep(0.05)
-
-var events = watcher.step()
-if (events.count == 0) {
-    System.print("No change detected")
-    if (File.exists(path)) File.delete(path)
-    Process.exit(1)
-}
-
-var event = events[0]
-var diff = event["contentDiff"]
-var kind = event["kind"]
-var changedPath = event["path"]
-var changed = event["contentChanged"]
-
-System.print("kind=%(kind) path=%(changedPath)")
-System.print("contentChanged=%(changed)")
-if (diff != null) {
-    var startLine = diff["startLine"]
-    var addedCount = diff["addedCount"]
-    var removedCount = diff["removedCount"]
-    System.print("startLine=%(startLine) +%(addedCount) -%(removedCount)")
-}
-
-if (File.exists(path)) File.delete(path)
+System.print("=== line granularity (patience) ===")
+System.print(Diff.pretty(path, before, after, "line", "patience"))

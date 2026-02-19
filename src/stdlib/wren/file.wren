@@ -48,6 +48,14 @@ foreign class NativeWatch {
     foreign static waitEvent(handle, timeoutSeconds)
 }
 
+foreign class DiffUtil {
+    construct new() {}
+    foreign static pretty(path, before, after, granularity, algorithm)
+    foreign static patch(path, before, after)
+    foreign static patchColor(path, before, after)
+    foreign static applyPatchResult(base, patchText)
+}
+
 class Path {
     static join(a, b) { PathUtil.join(a, b) }
     static dirname(path) { PathUtil.dirname(path) }
@@ -57,11 +65,60 @@ class Path {
     static isAbsolute(path) { PathUtil.isAbsolute(path) }
 }
 
+class Diff {
+    static granularity_(granularity) {
+        if (granularity == "word") return "word"
+        if (granularity == "char") return "char"
+        return "line"
+    }
+
+    static algorithm_(algorithm) {
+        if (algorithm == "patience") return "patience"
+        if (algorithm == "lcs") return "lcs"
+        return "myers"
+    }
+
+    static pretty(path, before, after) {
+        return DiffUtil.pretty(path, before, after, "line", "myers")
+    }
+
+    static pretty(path, before, after, granularity) {
+        return DiffUtil.pretty(path, before, after, granularity_(granularity), "myers")
+    }
+
+    static pretty(path, before, after, granularity, algorithm) {
+        return DiffUtil.pretty(path, before, after, granularity_(granularity), algorithm_(algorithm))
+    }
+
+    static patch(path, before, after) {
+        return DiffUtil.patch(path, before, after)
+    }
+
+    static patchColor(path, before, after) {
+        return DiffUtil.patchColor(path, before, after)
+    }
+
+    static applyPatchResult(base, patchText) {
+        return DiffUtil.applyPatchResult(base, patchText)
+    }
+
+    static applyPatch(base, patchText) {
+        var result = applyPatchResult(base, patchText)
+        if (result.count < 2) return null
+        if (result[0] != "ok") return null
+        return result[1]
+    }
+}
+
 class FileWatcher {
     construct new(path) {
         _root = Path.absolute(path)
         _recursive = true
         _pollInterval = 0.25
+        _diffGranularity = "line"
+        _diffAlgorithm = "myers"
+        _includePrettyDiff = true
+        _includePatch = true
         _listeners = []
         _running = false
         _snapshot = {}
@@ -89,6 +146,26 @@ class FileWatcher {
     pollInterval(seconds) {
         if (seconds <= 0) return this
         _pollInterval = seconds
+        return this
+    }
+
+    diffGranularity(granularity) {
+        _diffGranularity = Diff.granularity_(granularity)
+        return this
+    }
+
+    diffAlgorithm(algorithm) {
+        _diffAlgorithm = Diff.algorithm_(algorithm)
+        return this
+    }
+
+    includePrettyDiff(enabled) {
+        _includePrettyDiff = enabled
+        return this
+    }
+
+    includePatch(enabled) {
+        _includePatch = enabled
         return this
     }
 
@@ -314,6 +391,21 @@ class FileWatcher {
             isDirectory = before["isDirectory"]
         }
         var contentDiff = contentDiffFor_(kind, isDirectory, beforeContent, afterContent)
+        var prettyDiff = null
+        var patch = null
+        var patchColor = null
+
+        if (contentDiff != null) {
+            var beforeText = beforeContent == null ? "" : beforeContent
+            var afterText = afterContent == null ? "" : afterContent
+            if (_includePrettyDiff) {
+                prettyDiff = Diff.pretty(path, beforeText, afterText, _diffGranularity, _diffAlgorithm)
+            }
+            if (_includePatch) {
+                patch = Diff.patch(path, beforeText, afterText)
+                patchColor = Diff.patchColor(path, beforeText, afterText)
+            }
+        }
 
         return {
             "kind": kind,
@@ -324,7 +416,12 @@ class FileWatcher {
             "before": before,
             "after": after,
             "contentChanged": contentDiff != null,
-            "contentDiff": contentDiff
+            "contentDiff": contentDiff,
+            "diffGranularity": _diffGranularity,
+            "diffAlgorithm": _diffAlgorithm,
+            "prettyDiff": prettyDiff,
+            "patch": patch,
+            "patchColor": patchColor
         }
     }
 
@@ -360,6 +457,10 @@ class NativeFileWatcher {
         _pollInterval = 0.10
         _waitTimeout = 0.50
         _fallbackPolling = true
+        _diffGranularity = "line"
+        _diffAlgorithm = "myers"
+        _includePrettyDiff = true
+        _includePatch = true
         _listeners = []
         _running = false
         _handle = 0
@@ -417,6 +518,26 @@ class NativeFileWatcher {
 
     fallbackPolling(enabled) {
         _fallbackPolling = enabled
+        return this
+    }
+
+    diffGranularity(granularity) {
+        _diffGranularity = Diff.granularity_(granularity)
+        return this
+    }
+
+    diffAlgorithm(algorithm) {
+        _diffAlgorithm = Diff.algorithm_(algorithm)
+        return this
+    }
+
+    includePrettyDiff(enabled) {
+        _includePrettyDiff = enabled
+        return this
+    }
+
+    includePatch(enabled) {
+        _includePatch = enabled
         return this
     }
 
@@ -757,6 +878,21 @@ class NativeFileWatcher {
         var paths = []
         if (path != null) paths.add(path)
         var contentDiff = contentDiffFor_(kind, isDirectory, beforeContent, afterContent)
+        var prettyDiff = null
+        var patch = null
+        var patchColor = null
+
+        if (contentDiff != null) {
+            var beforeText = beforeContent == null ? "" : beforeContent
+            var afterText = afterContent == null ? "" : afterContent
+            if (_includePrettyDiff) {
+                prettyDiff = Diff.pretty(path, beforeText, afterText, _diffGranularity, _diffAlgorithm)
+            }
+            if (_includePatch) {
+                patch = Diff.patch(path, beforeText, afterText)
+                patchColor = Diff.patchColor(path, beforeText, afterText)
+            }
+        }
 
         return {
             "kind": kind,
@@ -770,7 +906,12 @@ class NativeFileWatcher {
             "before": before,
             "after": after,
             "contentChanged": contentDiff != null,
-            "contentDiff": contentDiff
+            "contentDiff": contentDiff,
+            "diffGranularity": _diffGranularity,
+            "diffAlgorithm": _diffAlgorithm,
+            "prettyDiff": prettyDiff,
+            "patch": patch,
+            "patchColor": patchColor
         }
     }
 
@@ -809,6 +950,21 @@ class NativeFileWatcher {
             }
         }
         var contentDiff = contentDiffFor_(kind, isDirectory, beforeContent, afterContent)
+        var prettyDiff = null
+        var patch = null
+        var patchColor = null
+
+        if (contentDiff != null) {
+            var beforeText = beforeContent == null ? "" : beforeContent
+            var afterText = afterContent == null ? "" : afterContent
+            if (_includePrettyDiff) {
+                prettyDiff = Diff.pretty(path, beforeText, afterText, _diffGranularity, _diffAlgorithm)
+            }
+            if (_includePatch) {
+                patch = Diff.patch(path, beforeText, afterText)
+                patchColor = Diff.patchColor(path, beforeText, afterText)
+            }
+        }
 
         return {
             "kind": kind,
@@ -822,7 +978,12 @@ class NativeFileWatcher {
             "before": before,
             "after": after,
             "contentChanged": contentDiff != null,
-            "contentDiff": contentDiff
+            "contentDiff": contentDiff,
+            "diffGranularity": _diffGranularity,
+            "diffAlgorithm": _diffAlgorithm,
+            "prettyDiff": prettyDiff,
+            "patch": patch,
+            "patchColor": patchColor
         }
     }
 

@@ -52,7 +52,7 @@ Process.sleep(0.25)
 File system operations.
 
 ```wren
-import "wrun/file" for File, Dir, Path, FileWatcher, NativeFileWatcher
+import "wrun/file" for File, Dir, Path, FileWatcher, NativeFileWatcher, Diff
 
 // Read/write files
 File.write("test.txt", "Hello World")
@@ -90,16 +90,31 @@ Path.extension("test.txt")   // "txt"
 Path.absolute("./file.txt")  // full path
 Path.isAbsolute("/tmp")      // true
 
+// Pretty diff + patch helpers (similar + diffy)
+var before = "a\nb\nc\n"
+var after = "a\nB\nc\n"
+System.print(Diff.pretty("demo.txt", before, after, "line"))  // line/word/char
+System.print(Diff.pretty("demo.txt", before, after, "line", "patience")) // algorithm: myers/patience/lcs
+var patch = Diff.patch("demo.txt", before, after)
+var applyResult = Diff.applyPatchResult(before, patch) // ["ok", "..."] or ["error", "..."]
+
 // Watch changes (handler called through fibers with context map)
 var watcher = FileWatcher
     .watch(".", Fn.new { |event|
         System.print("%(event[\"kind\"]) %(event[\"path\"])")
+        if (event["prettyDiff"] != null) {
+            System.print(event["prettyDiff"]) // ANSI colored output
+        }
         if (event["contentChanged"]) {
             var diff = event["contentDiff"]
             System.print("  +%(diff[\"addedCount\"]) -%(diff[\"removedCount\"]) at line %(diff[\"startLine\"])")
         }
     })
     .recursive(true)
+    .diffGranularity("line")
+    .diffAlgorithm("myers")
+    .includePrettyDiff(true)
+    .includePatch(true)
     .pollInterval(0.2)
 
 watcher.run()
@@ -109,12 +124,19 @@ watcher.run()
 var nativeWatcher = NativeFileWatcher
     .watch(".", Fn.new { |event|
         System.print("native %(event[\"kind\"]) %(event[\"path\"])")
+        if (event["prettyDiff"] != null) {
+            System.print(event["prettyDiff"]) // ANSI colored output
+        }
         if (event["contentChanged"]) {
             var diff = event["contentDiff"]
             System.print("  +%(diff[\"addedCount\"]) -%(diff[\"removedCount\"]) at line %(diff[\"startLine\"])")
         }
     })
     .recursive(true)
+    .diffGranularity("line")
+    .diffAlgorithm("myers")
+    .includePrettyDiff(true)
+    .includePatch(true)
     .mode("wait")        // "wait" (blocking) or "poll"
     .waitTimeout(0.5)    // blocking wait timeout in seconds
     .fallbackPolling(true)

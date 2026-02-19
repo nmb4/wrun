@@ -17,6 +17,10 @@ var watcher = NativeFileWatcher.new(path)
     .recursive(false)
     .mode("wait")
     .waitTimeout(0.2)
+    .diffGranularity("line")
+    .diffAlgorithm("myers")
+    .includePatch(true)
+    .includePrettyDiff(true)
     .fallbackPolling(true)
 
 watcher.onChange(Fn.new { |event|
@@ -36,6 +40,8 @@ assert.call(event["contentChanged"], "expected contentChanged=true")
 var diff = event["contentDiff"]
 assert.call(diff != null, "expected non-null contentDiff")
 assert.call(diff["addedCount"] >= 1, "expected at least one added line")
+assert.call(event["prettyDiff"] != null, "expected prettyDiff to be present")
+assert.call(event["patch"] != null, "expected patch to be present")
 
 System.print("PASS: native watcher wait mode smoke test")
 

@@ -16,6 +16,10 @@ var events = []
 var watcher = NativeFileWatcher.new(path)
     .recursive(false)
     .mode("poll")
+    .diffGranularity("line")
+    .diffAlgorithm("myers")
+    .includePatch(true)
+    .includePrettyDiff(true)
     .pollInterval(0.02)
     .fallbackPolling(true)
 
@@ -35,6 +39,8 @@ assert.call(event["contentChanged"], "expected contentChanged=true")
 var diff = event["contentDiff"]
 assert.call(diff != null, "expected non-null contentDiff")
 assert.call(diff["addedCount"] >= 1, "expected at least one added line")
+assert.call(event["prettyDiff"] != null, "expected prettyDiff to be present")
+assert.call(event["patch"] != null, "expected patch to be present")
 
 System.print("PASS: native watcher poll mode smoke test")
 

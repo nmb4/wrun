@@ -222,7 +222,7 @@ System.print(Str.splitLimit("a,b,c", ",", 2)) // ["a", "b,c"]
 File system operations and path utilities.
 
 ```wren
-import "wrun/file" for File, Dir, PathUtil, Path, FileWatcher, NativeFileWatcher
+import "wrun/file" for File, Dir, PathUtil, Path, FileWatcher, NativeFileWatcher, Diff
 ```
 
 ### File Class
@@ -280,6 +280,20 @@ Static methods wrapping `PathUtil` for convenience.
 | `Path.absolute(path)` | `String` | Returns absolute path |
 | `Path.isAbsolute(path)` | `Bool` | Checks if path is absolute |
 
+### Diff Class
+
+Diff rendering and patch utilities (backed by `similar` + `diffy`).
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `Diff.pretty(path, before, after)` | `String` | ANSI-colored pretty diff (`line` granularity) |
+| `Diff.pretty(path, before, after, granularity)` | `String` | Pretty diff with `line`, `word`, or `char` granularity |
+| `Diff.pretty(path, before, after, granularity, algorithm)` | `String` | Pretty diff with granularity + algorithm (`myers`, `patience`, `lcs`) |
+| `Diff.patch(path, before, after)` | `String` | Unified patch text (`--- a/...`, `+++ b/...`) |
+| `Diff.patchColor(path, before, after)` | `String` | ANSI-colored unified patch text |
+| `Diff.applyPatchResult(base, patchText)` | `List` | `["ok", patched]` or `["error", message]` |
+| `Diff.applyPatch(base, patchText)` | `String?` | Patched text or `null` on failure |
+
 ### FileWatcher Class
 
 Polling file system watcher that dispatches changes to fibers/callables.
@@ -293,6 +307,10 @@ Polling file system watcher that dispatches changes to fibers/callables.
 | `clearHandlers()` | `FileWatcher` | Remove all handlers |
 | `recursive(enabled)` | `FileWatcher` | Enable/disable recursive directory watching |
 | `pollInterval(seconds)` | `FileWatcher` | Set polling interval (default `0.25`) |
+| `diffGranularity(granularity)` | `FileWatcher` | Set pretty diff granularity: `line`, `word`, `char` |
+| `diffAlgorithm(algorithm)` | `FileWatcher` | Set pretty diff algorithm: `myers`, `patience`, `lcs` |
+| `includePrettyDiff(enabled)` | `FileWatcher` | Include/exclude `prettyDiff` event field |
+| `includePatch(enabled)` | `FileWatcher` | Include/exclude `patch`/`patchColor` event fields |
 | `start()` | `FileWatcher` | Start watcher and capture baseline snapshot |
 | `stop()` | `FileWatcher` | Stop watcher |
 | `step()` | `List` | Poll once, dispatch handlers, return list of events |
@@ -317,6 +335,11 @@ Event context map passed to handlers:
   - `removed`: list of removed lines
   - `addedCount`: number of added lines
   - `removedCount`: number of removed lines
+- `diffGranularity`: selected pretty diff granularity (`line`, `word`, `char`)
+- `diffAlgorithm`: selected pretty diff algorithm (`myers`, `patience`, `lcs`)
+- `prettyDiff`: ANSI-colored human-readable diff string or `null`
+- `patch`: unified patch string or `null`
+- `patchColor`: ANSI-colored unified patch string or `null`
 
 ### NativeFileWatcher Class
 
@@ -336,6 +359,10 @@ If native events are unavailable, it can temporarily fall back to metadata polli
 | `pollInterval(seconds)` | `NativeFileWatcher` | Sleep duration used by `run()` loop (default `0.10`) |
 | `waitTimeout(seconds)` | `NativeFileWatcher` | Blocking wait timeout used in `"wait"` mode (default `0.50`) |
 | `fallbackPolling(enabled)` | `NativeFileWatcher` | Enable/disable fallback polling (default `true`) |
+| `diffGranularity(granularity)` | `NativeFileWatcher` | Set pretty diff granularity: `line`, `word`, `char` |
+| `diffAlgorithm(algorithm)` | `NativeFileWatcher` | Set pretty diff algorithm: `myers`, `patience`, `lcs` |
+| `includePrettyDiff(enabled)` | `NativeFileWatcher` | Include/exclude `prettyDiff` event field |
+| `includePatch(enabled)` | `NativeFileWatcher` | Include/exclude `patch`/`patchColor` event fields |
 | `start()` | `NativeFileWatcher` | Start native watcher |
 | `stop()` | `NativeFileWatcher` | Stop and close native watcher |
 | `step()` | `List` | Drain queued native events, dispatch handlers, return list |
@@ -361,6 +388,11 @@ Native event context map:
 - `after`: best-effort current snapshot state map or `null`
 - `contentChanged`: `true` when file content differs (`false` for directories/no content change)
 - `contentDiff`: line-level diff map or `null` (same shape as `FileWatcher`)
+- `diffGranularity`: selected pretty diff granularity (`line`, `word`, `char`)
+- `diffAlgorithm`: selected pretty diff algorithm (`myers`, `patience`, `lcs`)
+- `prettyDiff`: ANSI-colored human-readable diff string or `null`
+- `patch`: unified patch string or `null`
+- `patchColor`: ANSI-colored unified patch string or `null`
 
 **Examples**:
 ```wren
@@ -375,12 +407,24 @@ for (entry in entries) {
 var path = Path.join("src", "main.wren")
 System.print(Path.extension(path))  // ".wren"
 
+var before = "a\nb\nc\n"
+var after = "a\nB\nc\n"
+System.print(Diff.pretty("demo.txt", before, after, "line"))
+System.print(Diff.pretty("demo.txt", before, after, "line", "patience"))
+var patch = Diff.patch("demo.txt", before, after)
+var applied = Diff.applyPatchResult(before, patch)
+
 // Watch file system changes and dispatch through fibers
 var watcher = FileWatcher
     .watch(".", Fn.new { |event|
         System.print("%(event[\"kind\"]): %(event[\"path\"])")
+        if (event["prettyDiff"] != null) System.print(event["prettyDiff"])
     })
     .recursive(true)
+    .diffGranularity("line")
+    .diffAlgorithm("myers")
+    .includePrettyDiff(true)
+    .includePatch(true)
     .pollInterval(0.2)
 
 watcher.run()
@@ -389,11 +433,16 @@ watcher.run()
 var nativeWatcher = NativeFileWatcher
     .watch(".", Fn.new { |event|
         System.print("%(event[\"kind\"]): %(event[\"path\"])")
+        if (event["prettyDiff"] != null) System.print(event["prettyDiff"])
     })
     .recursive(true)
     .mode("wait")
     .waitTimeout(0.5)
     .fallbackPolling(true)
+    .diffGranularity("line")
+    .diffAlgorithm("myers")
+    .includePrettyDiff(true)
+    .includePatch(true)
     .pollInterval(0.1)
 
 nativeWatcher.run()
@@ -684,7 +733,7 @@ Additional async methods on the Shell class.
 ```wren
 import "wrun/print" for Print, Log
 import "wrun/str" for Str
-import "wrun/file" for File, Dir, Path, FileWatcher, NativeFileWatcher
+import "wrun/file" for File, Dir, Path, FileWatcher, NativeFileWatcher, Diff
 import "wrun/env" for Env
 import "wrun/args" for Args
 import "wrun/process" for Process, Shell
@@ -698,7 +747,7 @@ import "wrun/pipeline" for Pipeline, Parallel, Sequential
 ```wren
 import "wrun/print" for Log, Print
 import "wrun/str" for Str
-import "wrun/file" for File, Dir, Path, FileWatcher, NativeFileWatcher
+import "wrun/file" for File, Dir, Path, FileWatcher, NativeFileWatcher, Diff
 import "wrun/env" for Env
 import "wrun/args" for Args
 import "wrun/process" for Shell, Process

@@ -1,10 +1,13 @@
 #![allow(non_snake_case)]
 
+use diffy::{Patch, PatchFormatter, apply, create_patch};
 use notify::event::ModifyKind;
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use ruwren::foreign_v2::WrenString;
 use ruwren::{wren_impl, ModuleLibrary, WrenObject};
+use similar::{Algorithm, ChangeTag, TextDiff};
 use std::collections::{HashMap, VecDeque};
+use std::fmt::Write;
 use std::fs;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -274,6 +277,233 @@ fn encode_native_event(event: NativeEvent) -> Vec<String> {
     parts
 }
 
+fn pretty_path(path: &str) -> String {
+    if path.is_empty() {
+        "file".to_string()
+    } else {
+        path.to_string()
+    }
+}
+
+fn with_path_headers(patch: String, path: &str) -> String {
+    let path = pretty_path(path);
+    let old_header = format!("--- a/{path}");
+    let new_header = format!("+++ b/{path}");
+    patch
+        .replacen("--- original", &old_header, 1)
+        .replacen("+++ modified", &new_header, 1)
+}
+
+fn granularity_name(name: &str) -> &str {
+    match name.to_ascii_lowercase().as_str() {
+        "word" => "word",
+        "char" => "char",
+        _ => "line",
+    }
+}
+
+fn algorithm_name(name: &str) -> &str {
+    match name.to_ascii_lowercase().as_str() {
+        "patience" => "patience",
+        "lcs" => "lcs",
+        _ => "myers",
+    }
+}
+
+fn make_diff<'a>(
+    before: &'a str,
+    after: &'a str,
+    granularity: &str,
+    algorithm: &str,
+) -> TextDiff<'a, 'a, 'a, str> {
+    let mut cfg = TextDiff::configure();
+    let algorithm = match algorithm_name(algorithm) {
+        "patience" => Algorithm::Patience,
+        "lcs" => Algorithm::Lcs,
+        _ => Algorithm::Myers,
+    };
+    cfg.algorithm(algorithm);
+    match granularity_name(granularity) {
+        "word" => cfg.diff_words(before, after),
+        "char" => cfg.diff_chars(before, after),
+        _ => cfg.diff_lines(before, after),
+    }
+}
+
+fn strip_newline(value: &str) -> &str {
+    value.strip_suffix('\n').unwrap_or(value)
+}
+
+fn format_line_number(idx: Option<usize>, width: usize) -> String {
+    match idx {
+        Some(v) => format!("{:>width$}", v + 1, width = width),
+        None => " ".repeat(width),
+    }
+}
+
+fn pretty_diff_text(path: &str, before: &str, after: &str, granularity: &str, algorithm: &str) -> String {
+    let path = pretty_path(path);
+    let diff = make_diff(before, after, granularity, algorithm);
+
+    let mut added = 0usize;
+    let mut removed = 0usize;
+    let mut max_old = 1usize;
+    let mut max_new = 1usize;
+    for change in diff.iter_all_changes() {
+        if let Some(old_idx) = change.old_index() {
+            max_old = max_old.max(old_idx + 1);
+        }
+        if let Some(new_idx) = change.new_index() {
+            max_new = max_new.max(new_idx + 1);
+        }
+        match change.tag() {
+            ChangeTag::Insert => added += 1,
+            ChangeTag::Delete => removed += 1,
+            ChangeTag::Equal => {}
+        }
+    }
+
+    let mut out = String::new();
+    let mode = granularity_name(granularity);
+    let algo = algorithm_name(algorithm);
+    let _ = writeln!(
+        &mut out,
+        "• Edited {path} (\x1b[32m+{added}\x1b[0m \x1b[31m-{removed}\x1b[0m) [{mode}/{algo}]"
+    );
+
+    if mode == "line" {
+        let line_number_width = max_old.max(max_new).to_string().len();
+        let elision_indent = 2 + line_number_width + 1 + line_number_width + 1;
+        let groups = diff.grouped_ops(2);
+        for (idx, group) in groups.iter().enumerate() {
+            if idx > 0 {
+                let _ = writeln!(&mut out, "{}\x1b[90m⋮\x1b[0m", " ".repeat(elision_indent));
+            }
+            for op in group {
+                for change in diff.iter_changes(op) {
+                    let (old_idx, new_idx) = match change.tag() {
+                        ChangeTag::Delete => (change.old_index(), None),
+                        ChangeTag::Insert => (None, change.new_index()),
+                        ChangeTag::Equal => (change.old_index(), change.new_index()),
+                    };
+
+                    let old_num = format_line_number(old_idx, line_number_width);
+                    let new_num = format_line_number(new_idx, line_number_width);
+                    let text = strip_newline(change.value());
+                    let _ = write!(
+                        &mut out,
+                        "  \x1b[90m{old_num}\x1b[0m \x1b[90m{new_num}\x1b[0m "
+                    );
+
+                    match change.tag() {
+                        ChangeTag::Delete => {
+                            if text.is_empty() {
+                                let _ = writeln!(&mut out, "\x1b[31m-\x1b[0m");
+                            } else {
+                                let _ = writeln!(&mut out, "\x1b[31m-{text}\x1b[0m");
+                            }
+                        }
+                        ChangeTag::Insert => {
+                            if text.is_empty() {
+                                let _ = writeln!(&mut out, "\x1b[32m+\x1b[0m");
+                            } else {
+                                let _ = writeln!(&mut out, "\x1b[32m+{text}\x1b[0m");
+                            }
+                        }
+                        ChangeTag::Equal => {
+                            if text.is_empty() {
+                                let _ = writeln!(&mut out, " ");
+                            } else {
+                                let _ = writeln!(&mut out, " {text}");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        let _ = writeln!(
+            &mut out,
+            "    \x1b[90mGranularity: {mode} (inline token view)\x1b[0m"
+        );
+        let _ = write!(&mut out, "    ");
+        for change in diff.iter_all_changes() {
+            match change.tag() {
+                ChangeTag::Delete => {
+                    let _ = write!(&mut out, "\x1b[31m{}\x1b[0m", change.value());
+                }
+                ChangeTag::Insert => {
+                    let _ = write!(&mut out, "\x1b[32m{}\x1b[0m", change.value());
+                }
+                ChangeTag::Equal => {
+                    let _ = write!(&mut out, "{}", change.value());
+                }
+            }
+        }
+        if !out.ends_with('\n') {
+            out.push('\n');
+        }
+    }
+
+    out
+}
+
+#[derive(WrenObject, Default)]
+pub struct DiffUtil;
+
+#[wren_impl]
+impl DiffUtil {
+    fn pretty(
+        &self,
+        path: WrenString,
+        before: WrenString,
+        after: WrenString,
+        granularity: WrenString,
+        algorithm: WrenString,
+    ) -> String {
+        let path = path.into_string().unwrap_or_default();
+        let before = before.into_string().unwrap_or_default();
+        let after = after.into_string().unwrap_or_default();
+        let granularity = granularity
+            .into_string()
+            .unwrap_or_else(|_| "line".to_string());
+        let algorithm = algorithm
+            .into_string()
+            .unwrap_or_else(|_| "myers".to_string());
+        pretty_diff_text(&path, &before, &after, &granularity, &algorithm)
+    }
+
+    fn patch(&self, path: WrenString, before: WrenString, after: WrenString) -> String {
+        let path = path.into_string().unwrap_or_default();
+        let before = before.into_string().unwrap_or_default();
+        let after = after.into_string().unwrap_or_default();
+        with_path_headers(create_patch(&before, &after).to_string(), &path)
+    }
+
+    fn patchColor(&self, path: WrenString, before: WrenString, after: WrenString) -> String {
+        let path = path.into_string().unwrap_or_default();
+        let before = before.into_string().unwrap_or_default();
+        let after = after.into_string().unwrap_or_default();
+        let patch = create_patch(&before, &after);
+        let formatter = PatchFormatter::new().with_color();
+        let rendered = format!("{}", formatter.fmt_patch(&patch));
+        with_path_headers(rendered, &path)
+    }
+
+    fn applyPatchResult(&self, base: WrenString, patch_text: WrenString) -> Vec<String> {
+        let base = base.into_string().unwrap_or_default();
+        let patch_text = patch_text.into_string().unwrap_or_default();
+
+        match Patch::from_str(&patch_text) {
+            Ok(patch) => match apply(&base, &patch) {
+                Ok(result) => vec!["ok".to_string(), result],
+                Err(err) => vec!["error".to_string(), err.to_string()],
+            },
+            Err(err) => vec!["error".to_string(), err.to_string()],
+        }
+    }
+}
+
 #[derive(WrenObject, Default)]
 pub struct NativeWatch;
 
@@ -418,6 +648,7 @@ ruwren::wren_module! {
         pub crate::stdlib::file::Dir;
         pub crate::stdlib::file::PathUtil;
         pub crate::stdlib::file::NativeWatch;
+        pub crate::stdlib::file::DiffUtil;
     }
 }
 

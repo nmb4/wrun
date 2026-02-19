@@ -10,3 +10,5 @@ ruwren = "0.4.10"
 clap = { version = "4", features = ["derive"] }
 chrono = "0.4"
 notify = "6"
+similar = "2"
+diffy = "0.4"

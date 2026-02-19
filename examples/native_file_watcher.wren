@@ -8,6 +8,10 @@ var watcher = NativeFileWatcher.new(".")
     .recursive(true)
     .mode("wait")
     .waitTimeout(0.5)
+    .diffGranularity("line")
+    .diffAlgorithm("myers")
+    .includePatch(true)
+    .includePrettyDiff(true)
     .pollInterval(0.1)
 
 watcher.onChange(Fn.new { |event|
@@ -16,12 +20,17 @@ watcher.onChange(Fn.new { |event|
     Log.info("Native file change", {
         "kind": event["kind"],
         "path": event["path"],
+        "native": event["native"],
         "nativeTimestamp": event["nativeTimestamp"],
         "contentChanged": event["contentChanged"],
         "addedLines": diff == null ? 0 : diff["addedCount"],
         "removedLines": diff == null ? 0 : diff["removedCount"],
         "seen": seen
     })
+
+    if (event["prettyDiff"] != null) {
+        System.print(event["prettyDiff"])
+    }
 
     if (seen >= maxEvents) {
         watcher.stop()

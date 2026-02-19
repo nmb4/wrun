@@ -6,6 +6,10 @@ var seen = 0
 
 var watcher = FileWatcher.new(".")
     .recursive(true)
+    .diffGranularity("line")
+    .diffAlgorithm("myers")
+    .includePatch(true)
+    .includePrettyDiff(true)
     .pollInterval(0.2)
 
 watcher.onChange(Fn.new { |event|
@@ -20,6 +24,10 @@ watcher.onChange(Fn.new { |event|
         "removedLines": diff == null ? 0 : diff["removedCount"],
         "seen": seen
     })
+
+    if (event["prettyDiff"] != null) {
+        System.print(event["prettyDiff"])
+    }
 
     if (seen >= maxEvents) {
         watcher.stop()

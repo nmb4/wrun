@@ -15,6 +15,10 @@ File.write(path, "alpha\nbeta\ngamma")
 
 var watcher = FileWatcher.new(path)
     .recursive(false)
+    .diffGranularity("line")
+    .diffAlgorithm("myers")
+    .includePatch(true)
+    .includePrettyDiff(true)
     .start()
 
 File.write(path, "alpha\nbeta\nnext\nfinal")
@@ -33,6 +37,8 @@ assert.call(diff["algorithm"] == "line-prefix-suffix", "unexpected diff algorith
 assert.call(diff["startLine"] == 3, "expected diff start line to be 3")
 assert.call(diff["removedCount"] == 1, "expected one removed line")
 assert.call(diff["addedCount"] == 2, "expected two added lines")
+assert.call(event["prettyDiff"] != null, "expected prettyDiff to be present")
+assert.call(event["patch"] != null, "expected unified patch to be present")
 
 System.print("PASS: file watcher content diff smoke test")
 

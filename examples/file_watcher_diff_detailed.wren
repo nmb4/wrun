@@ -1,57 +1,35 @@
-import "wrun/file" for File, FileWatcher
+import "wrun/file" for Diff
 import "wrun/process" for Process
 
-var path = ".diff_detailed_example.txt"
-if (File.exists(path)) File.delete(path)
+var path = "config/app.env"
+var before = "APP_NAME=wrun\nAPP_MODE=dev\nAPI_PORT=3000\nFEATURE_X=false\n"
+var after = "APP_NAME=wrun\nAPP_MODE=prod\nAPI_PORT=3010\nFEATURE_X=true\nFEATURE_Y=true\n"
 
-var before = "title: Demo\nstatus: draft\nowner: alice\nreviewers: 1"
-var after = "title: Demo\nstatus: ready\nowner: bob\nreviewers: 2\nrelease: pending"
+System.print("=== pretty diff (line) ===")
+System.print(Diff.pretty(path, before, after, "line"))
 
-File.write(path, before)
+System.print("=== unified patch ===")
+var patch = Diff.patch(path, before, after)
+System.print(patch)
 
-var watcher = FileWatcher.new(path)
-    .recursive(false)
-    .start()
+System.print("=== colored unified patch ===")
+System.print(Diff.patchColor(path, before, after))
 
-File.write(path, after)
-Process.sleep(0.05)
-
-var events = watcher.step()
-if (events.count == 0) {
-    System.print("No change detected")
-    if (File.exists(path)) File.delete(path)
+System.print("=== apply patch result ===")
+var applied = Diff.applyPatchResult(before, patch)
+if (applied.count < 2) {
+    System.print("Unexpected patch result shape")
     Process.exit(1)
 }
 
-var event = events[0]
-var diff = event["contentDiff"]
-var changedPath = event["path"]
-var kind = event["kind"]
-var changed = event["contentChanged"]
-
-System.print("Detailed diff for %(changedPath)")
-System.print("kind=%(kind) changed=%(changed)")
-
-if (diff == null) {
-    System.print("No content diff available")
-    if (File.exists(path)) File.delete(path)
+if (applied[0] != "ok") {
+    System.print("Patch apply failed: %(applied[1])")
     Process.exit(1)
 }
 
-var algorithm = diff["algorithm"]
-var startLine = diff["startLine"]
-var removedCount = diff["removedCount"]
-var addedCount = diff["addedCount"]
-
-System.print("algorithm=%(algorithm) startLine=%(startLine)")
-System.print("removed (%(removedCount)):")
-for (line in diff["removed"]) {
-    System.print("  - %(line)")
+if (applied[1] != after) {
+    System.print("Patch apply mismatch")
+    Process.exit(1)
 }
 
-System.print("added (%(addedCount)):")
-for (line in diff["added"]) {
-    System.print("  + %(line)")
-}
-
-if (File.exists(path)) File.delete(path)
+System.print("Patch apply verified")
