@@ -1,27 +1,27 @@
-import "wrun/file" for NativeFileWatcher
+import "wrun/file" for FileWatcher
 import "wrun/print" for Log
 
-var maxEvents = 5
+// Non-native watcher demo:
+// Uses snapshot-based polling (FileWatcher), not OS-native events.
+var watchRoot = "."
+var maxEvents = 6
 var seen = 0
 
-var watcher = NativeFileWatcher.new(".")
+var watcher = FileWatcher.new(watchRoot)
     .recursive(true)
-    .mode("wait")
-    .waitTimeout(0.5)
     .diffGranularity("line")
     .diffAlgorithm("myers")
     .includePatch(true)
     .includePrettyDiff(true)
-    .pollInterval(0.1)
+    .pollInterval(0.2)
 
 watcher.onChange(Fn.new { |event|
     seen = seen + 1
     var diff = event["contentDiff"]
-    Log.info("Native file change", {
+    Log.info("Polling watcher event", {
         "kind": event["kind"],
         "path": event["path"],
-        "native": event["native"],
-        "nativeTimestamp": event["nativeTimestamp"],
+        "isDirectory": event["isDirectory"],
         "contentChanged": event["contentChanged"],
         "addedLines": diff == null ? 0 : diff["addedCount"],
         "removedLines": diff == null ? 0 : diff["removedCount"],
@@ -34,9 +34,13 @@ watcher.onChange(Fn.new { |event|
 
     if (seen >= maxEvents) {
         watcher.stop()
-        Log.info("Native watcher stopped", {"reason": "max events reached", "maxEvents": maxEvents})
+        Log.info("Watcher stopped", {"reason": "max events reached", "maxEvents": maxEvents})
     }
 })
 
-Log.info("Watching (native)", {"root": watcher.root, "recursive": true, "maxEvents": maxEvents})
+Log.info("Polling watcher started", {
+    "root": watcher.root,
+    "recursive": true,
+    "maxEvents": maxEvents
+})
 watcher.start().run()

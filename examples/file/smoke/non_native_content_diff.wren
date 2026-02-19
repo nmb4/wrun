@@ -40,6 +40,6 @@ assert.call(diff["addedCount"] == 2, "expected two added lines")
 assert.call(event["prettyDiff"] != null, "expected prettyDiff to be present")
 assert.call(event["patch"] != null, "expected unified patch to be present")
 
-System.print("PASS: file watcher content diff smoke test")
+System.print("PASS: non-native watcher content diff smoke test")
 
 if (File.exists(path)) File.delete(path)

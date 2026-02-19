@@ -52,7 +52,7 @@ Process.sleep(0.25)
 File system operations.
 
 ```wren
-import "wrun/file" for File, Dir, Path, FileWatcher, NativeFileWatcher, Diff
+import "wrun/file" for File, Dir, Path, Watcher, FileWatcher, NativeFileWatcher, Diff
 
 // Read/write files
 File.write("test.txt", "Hello World")
@@ -98,8 +98,8 @@ System.print(Diff.pretty("demo.txt", before, after, "line", "patience")) // algo
 var patch = Diff.patch("demo.txt", before, after)
 var applyResult = Diff.applyPatchResult(before, patch) // ["ok", "..."] or ["error", "..."]
 
-// Watch changes (handler called through fibers with context map)
-var watcher = FileWatcher
+// Watch changes (default: native-backed watcher alias)
+var watcher = Watcher
     .watch(".", Fn.new { |event|
         System.print("%(event[\"kind\"]) %(event[\"path\"])")
         if (event["prettyDiff"] != null) {
@@ -118,6 +118,12 @@ var watcher = FileWatcher
     .pollInterval(0.2)
 
 watcher.run()
+
+// Explicit non-native polling watcher
+var nonNative = FileWatcher.new(".")
+    .recursive(true)
+    .pollInterval(0.2)
+    .start()
 
 // Native OS-backed watcher (via notify backend)
 // Falls back to metadata polling until native events are observed.
@@ -196,18 +202,26 @@ All of these run from this project directory and leave no artifacts behind.
 
 ```bash
 # Native watcher demos
-cargo run --quiet -- examples/native_file_watcher.wren
-cargo run --quiet -- examples/native_file_watcher_poll_mode.wren
+cargo run --quiet -- examples/file/watchers/default_watcher_wait.wren
+cargo run --quiet -- examples/file/watchers/native_poll_watcher.wren
+
+# Non-native polling watcher demo
+cargo run --quiet -- examples/file/watchers/non_native_polling_watcher.wren
 
 # Content diff demos
-cargo run --quiet -- examples/file_watcher_diff_simple.wren
-cargo run --quiet -- examples/file_watcher_diff_detailed.wren
+cargo run --quiet -- examples/file/diff/pretty_diff_groups.wren
+cargo run --quiet -- examples/file/diff/patch_roundtrip.wren
 
 # Smoke tests
-cargo run --quiet -- examples/smoke_native_file_watcher_poll_mode.wren
-cargo run --quiet -- examples/smoke_native_file_watcher_wait_mode.wren
-cargo run --quiet -- examples/smoke_file_watcher_content_diff.wren
+cargo run --quiet -- examples/file/smoke/native_poll_mode.wren
+cargo run --quiet -- examples/file/smoke/native_wait_mode.wren
+cargo run --quiet -- examples/file/smoke/default_watcher_alias_native.wren
+cargo run --quiet -- examples/file/smoke/non_native_content_diff.wren
+cargo run --quiet -- examples/file/smoke/non_native_recursive_mode.wren
 ```
+
+Note: native strict probes may print `SKIP` on platforms/configurations where native
+content events are not observed; non-native smokes should still pass.
 
 ## Example Script
 

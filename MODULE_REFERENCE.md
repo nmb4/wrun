@@ -222,7 +222,7 @@ System.print(Str.splitLimit("a,b,c", ",", 2)) // ["a", "b,c"]
 File system operations and path utilities.
 
 ```wren
-import "wrun/file" for File, Dir, PathUtil, Path, FileWatcher, NativeFileWatcher, Diff
+import "wrun/file" for File, Dir, PathUtil, Path, Watcher, FileWatcher, NativeFileWatcher, Diff
 ```
 
 ### File Class
@@ -293,6 +293,17 @@ Diff rendering and patch utilities (backed by `similar` + `diffy`).
 | `Diff.patchColor(path, before, after)` | `String` | ANSI-colored unified patch text |
 | `Diff.applyPatchResult(base, patchText)` | `List` | `["ok", patched]` or `["error", message]` |
 | `Diff.applyPatch(base, patchText)` | `String?` | Patched text or `null` on failure |
+
+### Watcher Class (Default Alias)
+
+Default watcher alias that returns `NativeFileWatcher` instances.
+Use `FileWatcher` explicitly when you want non-native snapshot polling.
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `Watcher.new(path)` | `NativeFileWatcher` | Create native-backed watcher instance |
+| `Watcher.watch(path)` | `NativeFileWatcher` | Convenience constructor + start |
+| `Watcher.watch(path, handler)` | `NativeFileWatcher` | Convenience constructor with handler + start |
 
 ### FileWatcher Class
 
@@ -414,8 +425,8 @@ System.print(Diff.pretty("demo.txt", before, after, "line", "patience"))
 var patch = Diff.patch("demo.txt", before, after)
 var applied = Diff.applyPatchResult(before, patch)
 
-// Watch file system changes and dispatch through fibers
-var watcher = FileWatcher
+// Default watcher (native-backed alias)
+var watcher = Watcher
     .watch(".", Fn.new { |event|
         System.print("%(event[\"kind\"]): %(event[\"path\"])")
         if (event["prettyDiff"] != null) System.print(event["prettyDiff"])
@@ -428,6 +439,12 @@ var watcher = FileWatcher
     .pollInterval(0.2)
 
 watcher.run()
+
+// Explicit non-native polling watcher
+var nonNativeWatcher = FileWatcher.new(".")
+    .recursive(true)
+    .pollInterval(0.2)
+    .start()
 
 // Native OS-backed watcher
 var nativeWatcher = NativeFileWatcher
@@ -733,7 +750,7 @@ Additional async methods on the Shell class.
 ```wren
 import "wrun/print" for Print, Log
 import "wrun/str" for Str
-import "wrun/file" for File, Dir, Path, FileWatcher, NativeFileWatcher, Diff
+import "wrun/file" for File, Dir, Path, Watcher, FileWatcher, NativeFileWatcher, Diff
 import "wrun/env" for Env
 import "wrun/args" for Args
 import "wrun/process" for Process, Shell
@@ -747,7 +764,7 @@ import "wrun/pipeline" for Pipeline, Parallel, Sequential
 ```wren
 import "wrun/print" for Log, Print
 import "wrun/str" for Str
-import "wrun/file" for File, Dir, Path, FileWatcher, NativeFileWatcher, Diff
+import "wrun/file" for File, Dir, Path, Watcher, FileWatcher, NativeFileWatcher, Diff
 import "wrun/env" for Env
 import "wrun/args" for Args
 import "wrun/process" for Shell, Process

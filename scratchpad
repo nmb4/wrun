@@ -1,0 +1,31 @@
+
+how does the file watcher behave if the user presses ctrl+c?
+
+
+some sort of toggle for the file watcher to ingore wrun generated log files out of the box and generally the support for excluding specified dirs or files.
+
+when there are kv pairs and the length of the string exceeds 80 chars they should be put on seperate lines like with gum log, also there should be another arg for the log function that forces this put on different lines
+
+
+wrapping and cutoff for diff lines? should have an optional arg that defines a length after which the line is cutoff or hard wrapped which is also configureable on the fly with an arg to the function.
+
+
+read the attached script file and rewrite it as a wren script. look at all the examples and the module reference to find out how the custom modules for wrun work.
+
+
+
+i need some sort of way to redraw text in the terminal output. for example:
+
+Watching ./tests/
+	...
+	Added stuff.rs
+	Modified stuff.rs
+	Added more_stuff.rs
+
+so when a new event flies in it can be appended without having the output spamed, because the oldest one will be removed, the other two are moved up and the new one is printed last.
+that probably means there has to be a way to reset the text (maybe even just per line for something like a progressbar) on specific lines to then set the cursor and print out text again.
+
+
+wrun (rewrun) issue:
+Compile Error (main:15): Error at '"examples/file/diff/diff/diff/diff/diff/diff/diff/diff/pretty_di...': Module variable is already defined.
+this error should show the variable name, not the variable value.

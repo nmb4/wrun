@@ -1010,3 +1010,19 @@ class NativeFileWatcher {
         fiber.call()
     }
 }
+
+// Default watcher alias: native-backed watcher is the preferred default.
+// Use FileWatcher explicitly for non-native snapshot polling.
+class Watcher {
+    static new(path) {
+        return NativeFileWatcher.new(path)
+    }
+
+    static watch(path) {
+        return NativeFileWatcher.watch(path)
+    }
+
+    static watch(path, handler) {
+        return NativeFileWatcher.watch(path, handler)
+    }
+}
