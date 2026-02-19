@@ -115,6 +115,7 @@ class FileWatcher {
         _root = Path.absolute(path)
         _recursive = true
         _pollInterval = 0.25
+        _pathFilter = null
         _diffGranularity = "line"
         _diffAlgorithm = "myers"
         _includePrettyDiff = true
@@ -134,6 +135,23 @@ class FileWatcher {
         return FileWatcher.new(path).onChange(handler).start()
     }
 
+    static watchFile(path) {
+        var absPath = Path.absolute(path)
+        return FileWatcher.new(absPath)
+            .recursive(false)
+            .onlyPath(absPath)
+            .start()
+    }
+
+    static watchFile(path, handler) {
+        var absPath = Path.absolute(path)
+        return FileWatcher.new(absPath)
+            .recursive(false)
+            .onlyPath(absPath)
+            .onChange(handler)
+            .start()
+    }
+
     root { _root }
     running { _running }
     lastEvents { _lastEvents }
@@ -146,6 +164,16 @@ class FileWatcher {
     pollInterval(seconds) {
         if (seconds <= 0) return this
         _pollInterval = seconds
+        return this
+    }
+
+    onlyPath(path) {
+        _pathFilter = Path.absolute(path)
+        return this
+    }
+
+    clearPathFilter() {
+        _pathFilter = null
         return this
     }
 
@@ -199,6 +227,7 @@ class FileWatcher {
         var nextSnapshot = snapshot_()
         var nextContentCache = {}
         var events = diffSnapshots_(_snapshot, nextSnapshot, _contentCache, nextContentCache)
+        events = filterEvents_(events)
         _snapshot = nextSnapshot
         _contentCache = nextContentCache
         _lastEvents = events
@@ -425,6 +454,33 @@ class FileWatcher {
         }
     }
 
+    filterEvents_(events) {
+        if (_pathFilter == null) return events
+        var filtered = []
+        for (event in events) {
+            if (matchesPathFilter_(event)) {
+                filtered.add(event)
+            }
+        }
+        return filtered
+    }
+
+    matchesPathFilter_(event) {
+        if (_pathFilter == null) return true
+        if (event["path"] == _pathFilter) return true
+
+        if (event.containsKey("paths")) {
+            var paths = event["paths"]
+            if (paths != null) {
+                for (path in paths) {
+                    if (path == _pathFilter) return true
+                }
+            }
+        }
+
+        return false
+    }
+
     dispatchEvents_(events) {
         if (_listeners.count == 0 || events.count == 0) return
         for (event in events) {
@@ -457,6 +513,7 @@ class NativeFileWatcher {
         _pollInterval = 0.10
         _waitTimeout = 0.50
         _fallbackPolling = true
+        _pathFilter = null
         _diffGranularity = "line"
         _diffAlgorithm = "myers"
         _includePrettyDiff = true
@@ -478,6 +535,25 @@ class NativeFileWatcher {
 
     static watch(path, handler) {
         return NativeFileWatcher.new(path).onChange(handler).start()
+    }
+
+    static watchFile(path) {
+        var absPath = Path.absolute(path)
+        var parent = Path.dirname(absPath)
+        return NativeFileWatcher.new(parent)
+            .recursive(false)
+            .onlyPath(absPath)
+            .start()
+    }
+
+    static watchFile(path, handler) {
+        var absPath = Path.absolute(path)
+        var parent = Path.dirname(absPath)
+        return NativeFileWatcher.new(parent)
+            .recursive(false)
+            .onlyPath(absPath)
+            .onChange(handler)
+            .start()
     }
 
     root { _root }
@@ -518,6 +594,16 @@ class NativeFileWatcher {
 
     fallbackPolling(enabled) {
         _fallbackPolling = enabled
+        return this
+    }
+
+    onlyPath(path) {
+        _pathFilter = Path.absolute(path)
+        return this
+    }
+
+    clearPathFilter() {
+        _pathFilter = null
         return this
     }
 
@@ -608,6 +694,7 @@ class NativeFileWatcher {
             }
         }
 
+        events = filterEvents_(events)
         _lastEvents = events
         dispatchEvents_(events)
         return events
@@ -666,6 +753,7 @@ class NativeFileWatcher {
             }
         }
 
+        events = filterEvents_(events)
         _lastEvents = events
         dispatchEvents_(events)
         return events
@@ -915,6 +1003,33 @@ class NativeFileWatcher {
         }
     }
 
+    filterEvents_(events) {
+        if (_pathFilter == null) return events
+        var filtered = []
+        for (event in events) {
+            if (matchesPathFilter_(event)) {
+                filtered.add(event)
+            }
+        }
+        return filtered
+    }
+
+    matchesPathFilter_(event) {
+        if (_pathFilter == null) return true
+        if (event["path"] == _pathFilter) return true
+
+        if (event.containsKey("paths")) {
+            var paths = event["paths"]
+            if (paths != null) {
+                for (path in paths) {
+                    if (path == _pathFilter) return true
+                }
+            }
+        }
+
+        return false
+    }
+
     eventContext_(kind, path, paths, nativeTimestamp) {
         var before = null
         var after = null
@@ -1024,5 +1139,13 @@ class Watcher {
 
     static watch(path, handler) {
         return NativeFileWatcher.watch(path, handler)
+    }
+
+    static watchFile(path) {
+        return NativeFileWatcher.watchFile(path)
+    }
+
+    static watchFile(path, handler) {
+        return NativeFileWatcher.watchFile(path, handler)
     }
 }

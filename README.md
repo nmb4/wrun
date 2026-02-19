@@ -125,6 +125,13 @@ var nonNative = FileWatcher.new(".")
     .pollInterval(0.2)
     .start()
 
+// Single-file watcher helper (native-backed alias + path filter)
+var fileWatcher = Watcher.watchFile("config/app.env", Fn.new { |event|
+    if (event["contentChanged"]) {
+        System.print("config changed: %(event[\"path\"])")
+    }
+})
+
 // Native OS-backed watcher (via notify backend)
 // Falls back to metadata polling until native events are observed.
 var nativeWatcher = NativeFileWatcher
@@ -216,6 +223,7 @@ cargo run --quiet -- examples/file/diff/patch_roundtrip.wren
 cargo run --quiet -- examples/file/smoke/native_poll_mode.wren
 cargo run --quiet -- examples/file/smoke/native_wait_mode.wren
 cargo run --quiet -- examples/file/smoke/default_watcher_alias_native.wren
+cargo run --quiet -- examples/file/smoke/default_watch_file_helper.wren
 cargo run --quiet -- examples/file/smoke/non_native_content_diff.wren
 cargo run --quiet -- examples/file/smoke/non_native_recursive_mode.wren
 ```

@@ -304,6 +304,8 @@ Use `FileWatcher` explicitly when you want non-native snapshot polling.
 | `Watcher.new(path)` | `NativeFileWatcher` | Create native-backed watcher instance |
 | `Watcher.watch(path)` | `NativeFileWatcher` | Convenience constructor + start |
 | `Watcher.watch(path, handler)` | `NativeFileWatcher` | Convenience constructor with handler + start |
+| `Watcher.watchFile(path)` | `NativeFileWatcher` | Watch a single file with native-backed defaults |
+| `Watcher.watchFile(path, handler)` | `NativeFileWatcher` | Watch a single file and register handler |
 
 ### FileWatcher Class
 
@@ -314,9 +316,13 @@ Polling file system watcher that dispatches changes to fibers/callables.
 | `FileWatcher.new(path)` | `FileWatcher` | Create watcher rooted at file/directory path |
 | `FileWatcher.watch(path)` | `FileWatcher` | Convenience constructor + start |
 | `FileWatcher.watch(path, handler)` | `FileWatcher` | Convenience constructor with handler + start |
+| `FileWatcher.watchFile(path)` | `FileWatcher` | Convenience single-file watcher (non-native polling) |
+| `FileWatcher.watchFile(path, handler)` | `FileWatcher` | Convenience single-file watcher with handler |
 | `onChange(handler)` | `FileWatcher` | Register handler (`Fiber` or callable with `.call(event)`) |
 | `clearHandlers()` | `FileWatcher` | Remove all handlers |
 | `recursive(enabled)` | `FileWatcher` | Enable/disable recursive directory watching |
+| `onlyPath(path)` | `FileWatcher` | Filter emitted events to one absolute file path |
+| `clearPathFilter()` | `FileWatcher` | Remove path filter |
 | `pollInterval(seconds)` | `FileWatcher` | Set polling interval (default `0.25`) |
 | `diffGranularity(granularity)` | `FileWatcher` | Set pretty diff granularity: `line`, `word`, `char` |
 | `diffAlgorithm(algorithm)` | `FileWatcher` | Set pretty diff algorithm: `myers`, `patience`, `lcs` |
@@ -362,9 +368,13 @@ If native events are unavailable, it can temporarily fall back to metadata polli
 | `NativeFileWatcher.new(path)` | `NativeFileWatcher` | Create watcher rooted at file/directory path |
 | `NativeFileWatcher.watch(path)` | `NativeFileWatcher` | Convenience constructor + start |
 | `NativeFileWatcher.watch(path, handler)` | `NativeFileWatcher` | Convenience constructor with handler + start |
+| `NativeFileWatcher.watchFile(path)` | `NativeFileWatcher` | Convenience single-file watcher (parent dir + path filter) |
+| `NativeFileWatcher.watchFile(path, handler)` | `NativeFileWatcher` | Convenience single-file watcher with handler |
 | `onChange(handler)` | `NativeFileWatcher` | Register handler (`Fiber` or callable with `.call(event)`) |
 | `clearHandlers()` | `NativeFileWatcher` | Remove all handlers |
 | `recursive(enabled)` | `NativeFileWatcher` | Enable/disable recursive watching |
+| `onlyPath(path)` | `NativeFileWatcher` | Filter emitted events to one absolute file path |
+| `clearPathFilter()` | `NativeFileWatcher` | Remove path filter |
 | `mode(name)` | `NativeFileWatcher` | Set run loop model: `"poll"` or `"wait"` |
 | `blockingWait(enabled)` | `NativeFileWatcher` | Convenience: `true` => `"wait"`, `false` => `"poll"` |
 | `pollInterval(seconds)` | `NativeFileWatcher` | Sleep duration used by `run()` loop (default `0.10`) |
@@ -445,6 +455,13 @@ var nonNativeWatcher = FileWatcher.new(".")
     .recursive(true)
     .pollInterval(0.2)
     .start()
+
+// Single-file helper (native-backed alias + path filter)
+var fileWatcher = Watcher.watchFile("config/app.env", Fn.new { |event|
+    if (event["contentChanged"]) {
+        System.print("config changed: %(event[\"path\"])")
+    }
+})
 
 // Native OS-backed watcher
 var nativeWatcher = NativeFileWatcher

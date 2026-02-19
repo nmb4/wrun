@@ -79,6 +79,7 @@ Smoke tests are intentionally kept as regular example scripts and should remain 
 - `examples/file/smoke/native_poll_mode.wren`
 - `examples/file/smoke/native_wait_mode.wren`
 - `examples/file/smoke/default_watcher_alias_native.wren`
+- `examples/file/smoke/default_watch_file_helper.wren`
 
 Native strict probes may emit `SKIP` instead of `PASS` when native content events are
 not observed on the current platform/backend.
@@ -91,6 +92,7 @@ cargo run --quiet -- examples/file/smoke/non_native_recursive_mode.wren
 cargo run --quiet -- examples/file/smoke/native_poll_mode.wren
 cargo run --quiet -- examples/file/smoke/native_wait_mode.wren
 cargo run --quiet -- examples/file/smoke/default_watcher_alias_native.wren
+cargo run --quiet -- examples/file/smoke/default_watch_file_helper.wren
 ```
 
 ## Validation Checklist For Changes
