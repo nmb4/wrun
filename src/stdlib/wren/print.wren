@@ -35,6 +35,8 @@ foreign class LogInternal {
     foreign static customKv(level, msg, kv)
     foreign static live(level, msg)
     foreign static liveKv(level, msg, kv)
+    foreign static liveColor(level, msg, color)
+    foreign static liveColorKv(level, msg, kv, color)
 
     // Configuration
     foreign static setFile(path)
@@ -64,6 +66,8 @@ class Log {
     static custom(level, msg, kv) { LogInternal.customKv(level, msg, Log.serializeKv_(kv)) }
     static live(level, msg) { LogInternal.live(level, msg) }
     static live(level, msg, kv) { LogInternal.liveKv(level, msg, Log.serializeKv_(kv)) }
+    static liveColor(level, msg, color) { LogInternal.liveColor(level, msg, color) }
+    static liveColor(level, msg, kv, color) { LogInternal.liveColorKv(level, msg, Log.serializeKv_(kv), color) }
 
     // Configuration
     static setFile(path) { LogInternal.setFile(path) }

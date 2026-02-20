@@ -115,6 +115,8 @@ import "wrun/print" for Log
 | `Log.custom(level, msg, kv)` | Log custom level with key-value Map |
 | `Log.live(level, msg)` | Redraw one live terminal log line with normal log styling |
 | `Log.live(level, msg, kv)` | Live log line with key-value Map formatting |
+| `Log.liveColor(level, msg, color)` | Live log line with explicit badge/message color |
+| `Log.liveColor(level, msg, kv, color)` | Colored live log line with key-value Map |
 
 **Key-Value Format**: Pass a Wren `Map` which gets serialized to `key=value\0key=value` format.
 

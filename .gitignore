@@ -1,3 +1,4 @@
 /target
 *.log
 /.DS_Store
+/.wrun_pipeline_timings

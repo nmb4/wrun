@@ -426,8 +426,8 @@ fn log_live_message(level: u8, level_str: &str, msg: &str, kv_str: &str, custom_
     let mut out = stdout();
     let _ = write!(
         out,
-        "{}{}\x1b[0;39;2m{}\x1b[0;39m  {}{}\x1b[0m",
-        CLEAR_LINE, badge_str, time_terminal, msg, kv_formatted
+        "{}{}\x1b[0;39;2m{}\x1b[0;39m  \x1b[0;{}m{}\x1b[0;39m{}\x1b[0m",
+        CLEAR_LINE, badge_str, time_terminal, fg, msg, kv_formatted
     );
     let _ = out.flush();
     LIVE_LINE_ACTIVE.store(true, Ordering::SeqCst);
@@ -549,6 +549,39 @@ impl LogInternal {
         let kv = kv.into_string().unwrap_or_default();
         let (level, level_str, custom_color) = resolve_level(&level_name_str);
         log_live_message(level, &level_str, &msg, &kv, custom_color.as_deref());
+    }
+
+    fn liveColor(&self, level_name_str: WrenString, msg: WrenString, color: WrenString) {
+        let level_name_str = level_name_str.into_string().unwrap_or_default();
+        let msg = msg.into_string().unwrap_or_default();
+        let color = color.into_string().unwrap_or_default();
+        let (level, level_str, resolved_color) = resolve_level(&level_name_str);
+        let chosen_color = if color.is_empty() {
+            resolved_color
+        } else {
+            Some(color)
+        };
+        log_live_message(level, &level_str, &msg, "", chosen_color.as_deref());
+    }
+
+    fn liveColorKv(
+        &self,
+        level_name_str: WrenString,
+        msg: WrenString,
+        kv: WrenString,
+        color: WrenString,
+    ) {
+        let level_name_str = level_name_str.into_string().unwrap_or_default();
+        let msg = msg.into_string().unwrap_or_default();
+        let kv = kv.into_string().unwrap_or_default();
+        let color = color.into_string().unwrap_or_default();
+        let (level, level_str, resolved_color) = resolve_level(&level_name_str);
+        let chosen_color = if color.is_empty() {
+            resolved_color
+        } else {
+            Some(color)
+        };
+        log_live_message(level, &level_str, &msg, &kv, chosen_color.as_deref());
     }
 
     // Configuration

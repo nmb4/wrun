@@ -1,5 +1,5 @@
 // Pipeline - Async command orchestration library for wrun
-// 
+//
 // Features:
 // - Run commands in parallel or sequentially
 // - Define dependencies between commands
@@ -36,7 +36,7 @@ class TaskResult {
   stdout { _stdout }
   stderr { _stderr }
   success { _exitCode == 0 }
-  
+
   toString { "TaskResult(%(name), code=%(exitCode), success=%(success))" }
 }
 
@@ -405,9 +405,8 @@ class Pipeline {
     var whole = safe.floor
     var mins = (whole / 60).floor
     var secs = whole % 60
-    var deci = ((safe - whole) * 10).floor
     var secsText = secs < 10 ? "0%(secs)" : "%(secs)"
-    return "%(mins)m %(secsText).%(deci)s"
+    return "%(mins)m %(secsText)s"
   }
 
   updateLiveTimers_() {
@@ -427,23 +426,44 @@ class Pipeline {
 
       task.lastTimerSecond = tick
 
-      var kv = {
-        "task": task.name,
-        "elapsed": formatDuration_(elapsed)
-      }
+      var progress = null
+      var etaTotal = null
 
       if (task.expectedSeconds != null && task.expectedSeconds > 0) {
-        var remaining = task.expectedSeconds - elapsed
-        if (remaining < 0) remaining = 0
-        var progress = ((elapsed / task.expectedSeconds) * 100).floor
+        progress = ((elapsed / task.expectedSeconds) * 100).floor
         if (progress > 100) progress = 100
-        kv["eta"] = formatDuration_(remaining)
-        kv["progress"] = "%(progress) pct"
-      } else {
-        kv["eta"] = "unknown"
+        etaTotal = task.expectedSeconds
       }
 
-      Log.live(task.logLevel, "Running build step", kv)
+      var liveColor = "green"
+      if (task.expectedSeconds != null && task.expectedSeconds > 0) {
+        var eta = task.expectedSeconds
+        var blueStart = eta - 1
+        if (blueStart < 0) blueStart = 0
+        var redStart = eta * 1.5
+
+        if (elapsed < blueStart) {
+          liveColor = "green"
+        } else if (elapsed <= eta) {
+          liveColor = "blue"
+        } else if (elapsed < redStart) {
+          liveColor = "yellow"
+        } else {
+          liveColor = "red"
+        }
+      }
+
+      var elapsedText = formatDuration_(elapsed)
+      var message = null
+      if (etaTotal != null && progress != null) {
+        var progressText = "%(progress)" + "\%"
+        var etaText = formatDuration_(etaTotal)
+        message = "%(task.name) %(elapsedText)/%(etaText) %(progressText)"
+      } else {
+        message = "%(task.name) -- %(elapsedText)/--"
+      }
+
+      Log.liveColor("live", message, liveColor)
     }
   }
 
@@ -497,10 +517,10 @@ class Pipeline {
     var stdout = Shell.getStdout(task.handle)
     var stderr = Shell.getStderr(task.handle)
     Shell.cleanup(task.handle)
-    
+
     task.result = TaskResult.new(task.name, code, stdout, stderr)
     _results[task.name] = task.result
-    
+
     if (task.isBuildStep) {
       persistDuration_(task, duration)
     }
@@ -530,7 +550,7 @@ class Pipeline {
         }
       }
     }
-    
+
     task.invokeCallbacks()
   }
 
