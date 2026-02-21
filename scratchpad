@@ -44,3 +44,6 @@ after that we can create some smoke tests to check how ctrl+c handling performs 
 
 we need to add a oneliner to the readme like zellij or pkgx have one that doesnt install the binary but runs it once or caches it somehow.
 also a script "registry" running on my vercel domain with routes that resolve to scripts stored on that page somehow as a github repo of mine as source.
+
+
+TRANSRIBE MEMO FOR MORE IDEAS 131

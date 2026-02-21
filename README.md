@@ -206,6 +206,12 @@ cargo run --quiet -- examples/file/watchers/non_native_polling_watcher.wren
 cargo run --quiet -- examples/file/diff/pretty_diff_groups.wren
 cargo run --quiet -- examples/file/diff/patch_roundtrip.wren
 
+# Cross-compile Rust project for macOS + Windows (from macOS host)
+cargo run --quiet -- examples/process/cross_compile_mac_windows.wren . --clean
+
+# JavaFX Maven helper (build/run/watch/info/doctor)
+cargo run --quiet -- examples/process/javafx_maven_tool.wren info .
+
 # Smoke tests
 cargo run --quiet -- examples/file/smoke/native_poll_mode.wren
 cargo run --quiet -- examples/file/smoke/native_wait_mode.wren

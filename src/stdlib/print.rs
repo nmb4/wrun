@@ -31,6 +31,7 @@ const FG_BRIGHT_WHITE: &str = "\x1b[97m";
 const CLEAR_LINE: &str = "\r\x1b[2K";
 
 static LIVE_LINE_ACTIVE: AtomicBool = AtomicBool::new(false);
+static LIVE_BADGE_INDICATOR_FILLED: AtomicBool = AtomicBool::new(false);
 
 fn badge(level: u8, level_name: &str, custom_color: Option<&str>) -> String {
     let bg = bg_code(level, custom_color);
@@ -147,6 +148,8 @@ fn clear_live_line(newline: bool) {
     if !LIVE_LINE_ACTIVE.swap(false, Ordering::SeqCst) {
         return;
     }
+    // Reset the pulsing live-badge indicator when a live line ends.
+    LIVE_BADGE_INDICATOR_FILLED.store(false, Ordering::SeqCst);
     let mut out = stdout();
     if newline {
         let _ = write!(out, "{}\n", CLEAR_LINE);
@@ -419,7 +422,14 @@ fn log_live_message(level: u8, level_str: &str, msg: &str, kv_str: &str, custom_
     }
 
     let time_terminal = Local::now().format("%H:%M").to_string();
-    let badge_str = badge(level, level_str, custom_color);
+    let live_level_str = if level_str.trim().eq_ignore_ascii_case("live") {
+        let was_filled = LIVE_BADGE_INDICATOR_FILLED.fetch_xor(true, Ordering::SeqCst);
+        let indicator = if was_filled { '○' } else { '●' };
+        format!("{} LIVE", indicator)
+    } else {
+        level_str.to_string()
+    };
+    let badge_str = badge(level, &live_level_str, custom_color);
     let fg = fg_code(level, custom_color);
     let kv_formatted = format_kv(kv_str, fg);
 

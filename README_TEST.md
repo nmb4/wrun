@@ -1,3 +1,1 @@
-# wrun
-
-Generated README content here.
+README content

@@ -29,6 +29,12 @@ cargo run --quiet -- examples/file/diff/patch_roundtrip.wren
 # Pipeline build-step ETA demo
 cargo run --quiet -- examples/process/pipeline_build_step_eta.wren
 
+# Cross-compile Rust project for macOS + Windows (from macOS host)
+cargo run --quiet -- examples/process/cross_compile_mac_windows.wren . --clean
+
+# JavaFX Maven helper (build/run/watch/info/doctor)
+cargo run --quiet -- examples/process/javafx_maven_tool.wren info .
+
 # Smoke tests
 cargo run --quiet -- examples/file/smoke/non_native_content_diff.wren
 cargo run --quiet -- examples/file/smoke/non_native_recursive_mode.wren
