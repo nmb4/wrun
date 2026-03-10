@@ -1,0 +1,19 @@
+set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
+
+default_host := "mini"
+binary_name := "spacebot"
+
+# Build release binary and deploy it to ~/.cargo/bin on a remote host over SSH.
+# Stops the launchd service, replaces the binary, then restarts the service.
+# Optionally set service_label to skip auto-detection, e.g.:
+# just deploy-macmini service_label=com.example.spacebot
+deploy-macmini host=default_host service_label='':
+    cargo build --release --bin {{binary_name}}
+    ssh {{host}} 'set -euo pipefail; label="{{service_label}}"; if [ -z "$label" ]; then label=$(launchctl list | awk '\''tolower($3) ~ /spacebot/ {print $3; exit}'\''); fi; if [ -z "$label" ]; then echo "Could not determine launchd label containing '\''spacebot'\''." >&2; exit 1; fi; target=""; for candidate in "gui/$(id -u)/$label" "user/$(id -u)/$label" "system/$label" "$label"; do if launchctl print "$candidate" >/dev/null 2>&1; then target="$candidate"; break; fi; done; [ -z "$target" ] && target="$label"; echo "Stopping spacebot daemon if running"; ~/.cargo/bin/spacebot stop >/dev/null 2>&1 || true; pkill -TERM -f "/.cargo/bin/spacebot( |$)" >/dev/null 2>&1 || true; sleep 1; pkill -KILL -f "/.cargo/bin/spacebot( |$)" >/dev/null 2>&1 || true; rm -f ~/.spacebot/spacebot.pid ~/.spacebot/spacebot.sock; echo "Stopping launchd service: $target"; launchctl kill SIGTERM "$target" >/dev/null 2>&1 || launchctl stop "$target" >/dev/null 2>&1 || true'
+    ssh {{host}} 'mkdir -p ~/.cargo/bin'
+    scp target/release/{{binary_name}} {{host}}:~/.cargo/bin/{{binary_name}}.new
+    ssh {{host}} 'chmod +x ~/.cargo/bin/{{binary_name}}.new && mv ~/.cargo/bin/{{binary_name}}.new ~/.cargo/bin/{{binary_name}}'
+    ssh {{host}} 'set -euo pipefail; label="{{service_label}}"; if [ -z "$label" ]; then label=$(launchctl list | awk '\''tolower($3) ~ /spacebot/ {print $3; exit}'\''); fi; if [ -z "$label" ]; then echo "Could not determine launchd label containing '\''spacebot'\''." >&2; exit 1; fi; target=""; for candidate in "gui/$(id -u)/$label" "user/$(id -u)/$label" "system/$label" "$label"; do if launchctl print "$candidate" >/dev/null 2>&1; then target="$candidate"; break; fi; done; [ -z "$target" ] && target="$label"; echo "Starting launchd service: $target"; launchctl kickstart -k "$target" >/dev/null 2>&1 || launchctl start "$target" >/dev/null 2>&1 || true; for _ in $(seq 1 20); do if ~/.cargo/bin/spacebot status >/dev/null 2>&1; then echo "Spacebot daemon is running"; exit 0; fi; sleep 1; done; echo "Spacebot daemon did not report healthy status after restart" >&2; ~/.cargo/bin/spacebot status || true; exit 1'
+
+stop-macmini host=default_host service_label='':
+    ssh {{host}} 'set -euo pipefail; label="{{service_label}}"; if [ -z "$label" ]; then label=$(launchctl list | awk '\''tolower($3) ~ /spacebot/ {print $3; exit}'\''); fi; if [ -z "$label" ]; then echo "Could not determine launchd label containing '\''spacebot'\''." >&2; exit 1; fi; target=""; for candidate in "gui/$(id -u)/$label" "user/$(id -u)/$label" "system/$label" "$label"; do if launchctl print "$candidate" >/dev/null 2>&1; then target="$candidate"; break; fi; done; [ -z "$target" ] && target="$label"; echo "Stopping spacebot daemon if running"; ~/.cargo/bin/spacebot stop >/dev/null 2>&1 || true; pkill -TERM -f "/.cargo/bin/spacebot( |$)" >/dev/null 2>&1 || true; sleep 1; pkill -KILL -f "/.cargo/bin/spacebot( |$)" >/dev/null 2>&1 || true; rm -f ~/.spacebot/spacebot.pid ~/.spacebot/spacebot.sock; echo "Stopping launchd service: $target"; launchctl kill SIGTERM "$target" >/dev/null 2>&1 || launchctl stop "$target" >/dev/null 2>&1 || true'
