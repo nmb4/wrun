@@ -1,0 +1,3 @@
+[submodule "deps/ruwren"]
+	path = deps/ruwren
+	url = https://github.com/Jengamon/ruwren

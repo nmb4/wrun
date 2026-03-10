@@ -6,7 +6,7 @@ description = "A CLI runner for Wren scripts with system integration"
 license = "MIT"
 
 [dependencies]
-ruwren = "0.4.10"
+ruwren = { path = "deps/ruwren" }
 clap = { version = "4", features = ["derive"] }
 chrono = "0.4"
 notify = "6"
