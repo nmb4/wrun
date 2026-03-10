@@ -35,6 +35,14 @@ cargo run --quiet -- examples/process/cross_compile_mac_windows.wren . --clean
 # JavaFX Maven helper (build/run/watch/info/doctor)
 cargo run --quiet -- examples/process/javafx_maven_tool.wren info .
 
+# Install JavaFX helper into local registry and run globally by name
+cargo run --quiet -- registry install examples/process/javafx_maven_tool.wren --name mvn
+cargo run --quiet -- mvn info .
+
+# List/uninstall installed scripts
+cargo run --quiet -- registry list
+cargo run --quiet -- registry uninstall mvn
+
 # Smoke tests
 cargo run --quiet -- examples/file/smoke/non_native_content_diff.wren
 cargo run --quiet -- examples/file/smoke/non_native_recursive_mode.wren

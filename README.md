@@ -14,6 +14,44 @@ cargo install --path .
 wrun script.wren [args...]
 ```
 
+```bash
+# Evaluate inline code
+wrun -e "System.print(\"hi\")"
+```
+
+## Local Script Registry
+
+Install scripts once, then run them from any directory.
+
+```bash
+# Install from a file path into local registry
+wrun registry install ./mvn.wren --name mvn
+
+# Run by name (local file still wins if ./mvn exists)
+wrun mvn info .
+
+# Explicit registry execution
+wrun registry run mvn info .
+
+# Inspect installs
+wrun registry list
+wrun registry info mvn
+
+# Remove an install
+wrun registry uninstall mvn
+```
+
+Registry paths:
+- Metadata: `~/.wrun/registry/index.json`
+- Script snapshots: `~/.wrun/registry/scripts/<name>/script.wren`
+- Shell shims: `~/.wrun/bin/<name>` (or `<name>.cmd` on Windows)
+
+For direct command invocation (without typing `wrun`), add `~/.wrun/bin` to your `PATH`.
+
+```bash
+export PATH="$HOME/.wrun/bin:$PATH"
+```
+
 ## Built-in Modules
 
 ### wrun/process
@@ -211,6 +249,10 @@ cargo run --quiet -- examples/process/cross_compile_mac_windows.wren . --clean
 
 # JavaFX Maven helper (build/run/watch/info/doctor)
 cargo run --quiet -- examples/process/javafx_maven_tool.wren info .
+
+# Install JavaFX helper into local registry and run by name
+cargo run --quiet -- registry install examples/process/javafx_maven_tool.wren --name mvn
+cargo run --quiet -- mvn info .
 
 # Smoke tests
 cargo run --quiet -- examples/file/smoke/native_poll_mode.wren

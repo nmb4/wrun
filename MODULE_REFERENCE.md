@@ -12,6 +12,42 @@ A comprehensive reference for all custom modules provided by the wrun runtime.
 4. [wrun/env](#wrunenv) - Environment variables and system info
 5. [wrun/args](#wrunargs) - Command-line arguments
 6. [wrun/process](#wrunprocess) - Process control and shell commands
+7. [wrun CLI Registry](#wrun-cli-registry) - Local script install/list/run/uninstall
+
+---
+
+## wrun CLI Registry
+
+The `wrun` binary includes a local script registry under `~/.wrun` so scripts can be
+installed once and executed from any working directory.
+
+### Command Summary
+
+| Command | Description |
+|---------|-------------|
+| `wrun registry install <source.wren> [--name <name>] [--force] [--no-shim]` | Install script snapshot into local registry |
+| `wrun registry uninstall <name>` | Remove installed script + shim |
+| `wrun registry list [--json]` | List installed scripts |
+| `wrun registry info <name> [--json]` | Show installed script metadata |
+| `wrun registry run <name> [args...]` | Run installed script explicitly |
+
+### Resolution Rules for `wrun <token>`
+
+1. If `<token>` exists as a local/absolute/relative file path, run that file.
+2. Otherwise, if `<token>` matches an installed registry name, run installed snapshot.
+3. Otherwise, return not-found guidance.
+
+### Registry Storage
+
+- Metadata: `~/.wrun/registry/index.json`
+- Script snapshots: `~/.wrun/registry/scripts/<name>/script.wren`
+- Shims: `~/.wrun/bin/<name>` (or `<name>.cmd` on Windows)
+
+### Notes
+
+- Install mode is snapshot copy (not symlink).
+- One active install per script name.
+- Add `~/.wrun/bin` to `PATH` if you want to run installed scripts directly.
 
 ---
 
